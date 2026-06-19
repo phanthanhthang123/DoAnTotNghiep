@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchData, postData } from "@/lib/fetch-utlis";
+import { fetchData, postData, updateData, deleteData } from "@/lib/fetch-utlis";
 import type { Conversation, Message, User } from "@/type";
 import { io, type Socket } from "socket.io-client";
 
@@ -110,6 +110,64 @@ export const useCreateGroupConversationMutation = () => {
   });
 };
 
+export const useAddGroupMembersMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { conversationId: string; memberIds: string[] }) =>
+      postData(`/chat/conversations/${payload.conversationId}/members/add`, { memberIds: payload.memberIds }),
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+      await queryClient.invalidateQueries({ queryKey: ["chat-messages", variables.conversationId] });
+    },
+  });
+};
+
+export const useRemoveGroupMemberMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { conversationId: string; targetUserId: string }) =>
+      postData(`/chat/conversations/${payload.conversationId}/members/remove`, { targetUserId: payload.targetUserId }),
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+      await queryClient.invalidateQueries({ queryKey: ["chat-messages", variables.conversationId] });
+    },
+  });
+};
+
+export const useLeaveGroupMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { conversationId: string }) =>
+      postData(`/chat/conversations/${payload.conversationId}/members/leave`, {}),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    },
+  });
+};
+
+export const useUpdateGroupTitleMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { conversationId: string; title: string }) =>
+      updateData(`/chat/conversations/${payload.conversationId}/title`, { title: payload.title }),
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+      await queryClient.invalidateQueries({ queryKey: ["chat-messages", variables.conversationId] });
+    },
+  });
+};
+
+export const useDismissGroupMutation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { conversationId: string }) =>
+      deleteData(`/chat/conversations/${payload.conversationId}/dismiss`),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    },
+  });
+};
+
 export const useSendMessageMutation = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -203,17 +261,29 @@ export const useChatRealtime = (conversationId?: string | null) => {
       queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
     };
 
+    const onRenamed = (payload: { conversationId: string; title: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    };
+
+    const onDismissed = (payload: { conversationId: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    };
+
     socket.on("message:new", onMessage);
     socket.on("message:read:updated", onReadUpdated);
     socket.on("message:updated", onMessageUpdated);
     socket.on("message:pinned", onMessageUpdated);
     socket.on("message:deleted", onMessageDeleted);
+    socket.on("conversation:renamed", onRenamed);
+    socket.on("conversation:dismissed", onDismissed);
     return () => {
       socket.off("message:new", onMessage);
       socket.off("message:read:updated", onReadUpdated);
       socket.off("message:updated", onMessageUpdated);
       socket.off("message:pinned", onMessageUpdated);
       socket.off("message:deleted", onMessageDeleted);
+      socket.off("conversation:renamed", onRenamed);
+      socket.off("conversation:dismissed", onDismissed);
     };
   }, [queryClient, socket]);
 

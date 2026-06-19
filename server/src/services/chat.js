@@ -382,3 +382,239 @@ export const togglePinMessageService = (messageId, userId, isPinned) =>
     }
   });
 
+export const addGroupMembersService = (conversationId, userId, memberIds) =>
+  new Promise(async (resolve) => {
+    try {
+      const conversation = await db.Conversation.findByPk(conversationId);
+      if (!conversation) return resolve({ err: 1, msg: 'CONVERSATION NOT FOUND' });
+      if (conversation.type !== 'group') return resolve({ err: 1, msg: 'NOT A GROUP CONVERSATION' });
+
+      const requesterMember = await db.Conversation_Member.findOne({
+        where: { conversation_id: conversationId, user_id: userId },
+        include: [{ model: db.Users, as: 'user', attributes: ['username'] }]
+      });
+      if (!requesterMember || requesterMember.role !== 'owner') {
+        return resolve({ err: 1, msg: 'ONLY GROUP CREATOR CAN ADD MEMBERS' });
+      }
+
+      const now = new Date();
+      const newMembers = [];
+      const addedUsernames = [];
+      for (const id of memberIds) {
+        const targetUser = await db.Users.findByPk(id);
+        if (!targetUser) continue;
+        const exists = await db.Conversation_Member.findOne({
+          where: { conversation_id: conversationId, user_id: id }
+        });
+        if (!exists) {
+          const newMember = await db.Conversation_Member.create({
+            id: v4(),
+            conversation_id: conversationId,
+            user_id: id,
+            role: 'member',
+            joined_at: now,
+            last_read_at: null,
+            createdAt: now,
+            updatedAt: now,
+          });
+          newMembers.push(newMember);
+          addedUsernames.push(targetUser.username);
+        }
+      }
+
+      await conversation.update({ updatedAt: now });
+
+      let systemMessage = null;
+      if (addedUsernames.length > 0) {
+        const performerName = requesterMember.user?.username || 'Trưởng nhóm';
+        const content = `${performerName} đã thêm ${addedUsernames.join(', ')} vào nhóm`;
+        const msgRow = await db.Message.create({
+          id: v4(),
+          conversation_id: conversationId,
+          sender_id: userId,
+          content,
+          type: 'system',
+          createdAt: now,
+          updatedAt: now,
+        });
+        systemMessage = await db.Message.findByPk(msgRow.id, {
+          include: [{ model: db.Users, as: 'sender', attributes: ['id', 'username', 'email', 'avatarUrl'] }],
+        });
+      }
+
+      resolve({ err: 0, msg: 'OK', response: { newMembers, systemMessage } });
+    } catch (error) {
+      resolve({ err: 1, msg: 'FAILED TO ADD GROUP MEMBERS: ' + error.message });
+    }
+  });
+
+export const removeGroupMemberService = (conversationId, userId, targetUserId) =>
+  new Promise(async (resolve) => {
+    try {
+      const conversation = await db.Conversation.findByPk(conversationId);
+      if (!conversation) return resolve({ err: 1, msg: 'CONVERSATION NOT FOUND' });
+      if (conversation.type !== 'group') return resolve({ err: 1, msg: 'NOT A GROUP CONVERSATION' });
+
+      const requesterMember = await db.Conversation_Member.findOne({
+        where: { conversation_id: conversationId, user_id: userId },
+        include: [{ model: db.Users, as: 'user', attributes: ['username'] }]
+      });
+      if (!requesterMember || requesterMember.role !== 'owner') {
+        return resolve({ err: 1, msg: 'ONLY GROUP CREATOR CAN REMOVE MEMBERS' });
+      }
+
+      if (String(userId) === String(targetUserId)) {
+        return resolve({ err: 1, msg: 'CREATOR CANNOT REMOVE THEMSELVES, USE LEAVE GROUP INSTEAD' });
+      }
+
+      const targetMember = await db.Conversation_Member.findOne({
+        where: { conversation_id: conversationId, user_id: targetUserId },
+        include: [{ model: db.Users, as: 'user', attributes: ['username'] }]
+      });
+      if (!targetMember) return resolve({ err: 1, msg: 'MEMBER NOT IN GROUP' });
+
+      const targetName = targetMember.user?.username || 'Thành viên';
+      await targetMember.destroy();
+      
+      const now = new Date();
+      await conversation.update({ updatedAt: now });
+
+      const performerName = requesterMember.user?.username || 'Trưởng nhóm';
+      const content = `${performerName} đã xóa ${targetName} khỏi nhóm`;
+      const msgRow = await db.Message.create({
+        id: v4(),
+        conversation_id: conversationId,
+        sender_id: userId,
+        content,
+        type: 'system',
+        createdAt: now,
+        updatedAt: now,
+      });
+      const systemMessage = await db.Message.findByPk(msgRow.id, {
+        include: [{ model: db.Users, as: 'sender', attributes: ['id', 'username', 'email', 'avatarUrl'] }],
+      });
+
+      resolve({ err: 0, msg: 'OK', response: { systemMessage } });
+    } catch (error) {
+      resolve({ err: 1, msg: 'FAILED TO REMOVE GROUP MEMBER: ' + error.message });
+    }
+  });
+
+export const leaveGroupService = (conversationId, userId) =>
+  new Promise(async (resolve) => {
+    try {
+      const conversation = await db.Conversation.findByPk(conversationId);
+      if (!conversation) return resolve({ err: 1, msg: 'CONVERSATION NOT FOUND' });
+      if (conversation.type !== 'group') return resolve({ err: 1, msg: 'NOT A GROUP CONVERSATION' });
+
+      const member = await db.Conversation_Member.findOne({
+        where: { conversation_id: conversationId, user_id: userId },
+        include: [{ model: db.Users, as: 'user', attributes: ['username'] }]
+      });
+      if (!member) return resolve({ err: 1, msg: 'MEMBER NOT IN GROUP' });
+
+      const username = member.user?.username || 'Thành viên';
+      const isOwner = member.role === 'owner';
+      await member.destroy();
+
+      if (isOwner) {
+        const nextMember = await db.Conversation_Member.findOne({
+          where: { conversation_id: conversationId },
+          order: [['joined_at', 'ASC']]
+        });
+        if (nextMember) {
+          await nextMember.update({ role: 'owner' });
+        } else {
+          await conversation.destroy();
+        }
+      }
+
+      const now = new Date();
+      await conversation.update({ updatedAt: now });
+
+      const content = `${username} đã rời khỏi nhóm`;
+      const msgRow = await db.Message.create({
+        id: v4(),
+        conversation_id: conversationId,
+        sender_id: userId,
+        content,
+        type: 'system',
+        createdAt: now,
+        updatedAt: now,
+      });
+      const systemMessage = await db.Message.findByPk(msgRow.id, {
+        include: [{ model: db.Users, as: 'sender', attributes: ['id', 'username', 'email', 'avatarUrl'] }],
+      });
+
+      resolve({ err: 0, msg: 'OK', response: { systemMessage } });
+    } catch (error) {
+      resolve({ err: 1, msg: 'FAILED TO LEAVE GROUP: ' + error.message });
+    }
+  });
+
+export const updateGroupTitleService = (conversationId, userId, newTitle) =>
+  new Promise(async (resolve) => {
+    try {
+      const conversation = await db.Conversation.findByPk(conversationId);
+      if (!conversation) return resolve({ err: 1, msg: 'CONVERSATION NOT FOUND' });
+      if (conversation.type !== 'group') return resolve({ err: 1, msg: 'NOT A GROUP CONVERSATION' });
+
+      const member = await db.Conversation_Member.findOne({
+        where: { conversation_id: conversationId, user_id: userId },
+        include: [{ model: db.Users, as: 'user', attributes: ['username'] }]
+      });
+      if (!member || member.role !== 'owner') {
+        return resolve({ err: 1, msg: 'ONLY GROUP CREATOR CAN EDIT TITLE' });
+      }
+
+      const oldTitle = conversation.title;
+      await conversation.update({ title: newTitle.trim(), updatedAt: new Date() });
+
+      const performerName = member.user?.username || 'Trưởng nhóm';
+      const content = `${performerName} đã đổi tên nhóm từ "${oldTitle}" thành "${newTitle.trim()}"`;
+      
+      const now = new Date();
+      const msgRow = await db.Message.create({
+        id: v4(),
+        conversation_id: conversationId,
+        sender_id: userId,
+        content,
+        type: 'system',
+        createdAt: now,
+        updatedAt: now,
+      });
+      const systemMessage = await db.Message.findByPk(msgRow.id, {
+        include: [{ model: db.Users, as: 'sender', attributes: ['id', 'username', 'email', 'avatarUrl'] }],
+      });
+
+      resolve({ err: 0, msg: 'OK', response: { systemMessage } });
+    } catch (error) {
+      resolve({ err: 1, msg: 'FAILED TO UPDATE GROUP TITLE: ' + error.message });
+    }
+  });
+
+export const dismissGroupService = (conversationId, userId) =>
+  new Promise(async (resolve) => {
+    try {
+      const conversation = await db.Conversation.findByPk(conversationId);
+      if (!conversation) return resolve({ err: 1, msg: 'CONVERSATION NOT FOUND' });
+      if (conversation.type !== 'group') return resolve({ err: 1, msg: 'NOT A GROUP CONVERSATION' });
+
+      const member = await db.Conversation_Member.findOne({
+        where: { conversation_id: conversationId, user_id: userId }
+      });
+      if (!member || member.role !== 'owner') {
+        return resolve({ err: 1, msg: 'ONLY GROUP CREATOR CAN DISMISS GROUP' });
+      }
+
+      // Safe deletion sequence
+      await db.Conversation_Member.destroy({ where: { conversation_id: conversationId } });
+      await db.Message.destroy({ where: { conversation_id: conversationId } });
+      await conversation.destroy();
+
+      resolve({ err: 0, msg: 'OK' });
+    } catch (error) {
+      resolve({ err: 1, msg: 'FAILED TO DISMISS GROUP: ' + error.message });
+    }
+  });
+

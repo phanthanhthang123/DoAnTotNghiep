@@ -5,7 +5,10 @@ import taskRouter from './task';
 import chatRouter from './chat';
 import notificationRouter from './notification';
 
+import { checkActiveStatus } from '../middlewares/checkActiveStatus';
+
 const initRoutes = (app) => {
+    app.use('/api/v1', checkActiveStatus);
     app.use('/api/v1/project', projectRouter);
     app.use('/api/v1/auth', authRouter);
     app.use('/api/v1/workspace', workspaceRouter);

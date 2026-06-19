@@ -368,6 +368,27 @@ export const adminDeleteUser = async (req, res) => {
     }
 }
 
+export const adminToggleUserStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isActive } = req.body;
+        if (typeof isActive !== 'boolean') {
+            return res.status(400).json({
+                err: 1,
+                msg: 'isActive phải là giá trị boolean (true/false)'
+            });
+        }
+        const response = await services.adminToggleUserStatusService(id, isActive);
+        const status = response.err === 0 ? 200 : 400;
+        return res.status(status).json(response);
+    } catch (error) {
+        return res.status(500).json({
+            err: -1,
+            msg: 'Failed at admin toggle user status controller: ' + error
+        });
+    }
+}
+
 export const firstChangePassword = async (req, res) => {
     try {
         const { id, newPassword } = req.body;

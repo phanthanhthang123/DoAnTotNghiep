@@ -2,6 +2,40 @@ import db from '../models';
 import { v4 } from 'uuid';
 import { createNotificationService } from './notification';
 
+export const updateProjectProgress = async (projectId) => {
+    try {
+        const tasks = await db.Task.findAll({
+            where: {
+                project_id: projectId,
+                isArchived: false
+            }
+        });
+
+        const totalTasks = tasks.length;
+        const doneTasks = tasks.filter(t => t.status === 'Done').length;
+        const progressPercentage = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+        const [progressRecord, created] = await db.Progress.findOrCreate({
+            where: { project_id: projectId },
+            defaults: {
+                progress: progressPercentage,
+                updatedAt: new Date()
+            }
+        });
+
+        if (!created) {
+            await progressRecord.update({
+                progress: progressPercentage,
+                updatedAt: new Date()
+            });
+        }
+        console.log(`[Progress Update] Project ${projectId} is now at ${progressPercentage}%`);
+        return progressPercentage;
+    } catch (error) {
+        console.error('Failed to update project progress:', error);
+    }
+};
+
 //CREATE TASK
 export const createTaskService = (projectId, taskData, actorUserId) => new Promise(async (resolve, reject) => {
     try {
@@ -20,14 +54,12 @@ export const createTaskService = (projectId, taskData, actorUserId) => new Promi
             });
         }
 
-        const taskId = v4();
         // Handle assignees - if it's an array, take the first one (or you can create a separate Task_Assignees table for multiple assignees)
         const assignedTo = Array.isArray(taskData.assignees) && taskData.assignees.length > 0
             ? taskData.assignees[0]
             : (taskData.assignees || null);
 
         const task = await db.Task.create({
-            id: taskId,
             project_id: projectId,
             assigned_to: assignedTo,
             title: taskData.title.trim(),
@@ -46,6 +78,8 @@ export const createTaskService = (projectId, taskData, actorUserId) => new Promi
                 msg: 'FAILED TO CREATE TASK'
             });
         }
+
+        await updateProjectProgress(projectId);
 
         if (assignedTo) {
             const actor = actorUserId ? await db.Users.findByPk(actorUserId, { attributes: ['username'] }) : null;
@@ -349,6 +383,8 @@ export const updateTaskStatusService = (taskId, status, userId) => new Promise(a
             status: status,
             updatedAt: new Date()
         });
+
+        await updateProjectProgress(task.project_id);
 
         try {
             const numericTaskId = typeof taskId === 'string' && !isNaN(taskId) ? parseInt(taskId, 10) : taskId;
@@ -827,6 +863,8 @@ export const achievedTaskService = (taskId, userId) => new Promise(async (resolv
             updatedAt: new Date()
         });
 
+        await updateProjectProgress(task.project_id);
+
         // Log activity
         try {
             const numericTaskId = typeof taskId === 'string' && !isNaN(taskId) ? parseInt(taskId, 10) : taskId;
@@ -892,6 +930,8 @@ export const archiveTaskService = (taskId, userId) => new Promise(async (resolve
             isArchived: newArchiveStatus,
             updatedAt: new Date()
         });
+
+        await updateProjectProgress(task.project_id);
 
         // Log activity
         try {

@@ -21,7 +21,8 @@ import { Textarea } from "../ui/textarea";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
-import { useNavigate } from "react-router";
+import { useNavigate, useRevalidator } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface CreateWorkspaceProps {
   isCreatingWorkspace: boolean;
@@ -46,6 +47,8 @@ export const CreateWorkspace = ({
     }
   });
   const navigate = useNavigate();
+  const revalidator = useRevalidator();
+  const queryClient = useQueryClient();
   const {mutate,isPending} = useCreateWorkspaceMutation();
   
   const onSubmit = async (data: WorkspaceForm) => {
@@ -66,6 +69,10 @@ export const CreateWorkspace = ({
           setIsCreatingWorkspace(false);
           form.reset();
           toast.success("Tạo không gian làm việc thành công");
+          // Invalidate workspaces list query in React Query
+          queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+          // Revalidate React Router loader data to refresh layout/header dropdown
+          revalidator.revalidate();
           navigate(`/workspaces/${data.response.id}`);
         },
         onError: (error: any) => {

@@ -34,6 +34,7 @@ const buildPublicUserProfile = (user) => ({
     username: user.username,
     email: user.email,
     role: user.role,
+    isActive: user.isActive !== undefined ? user.isActive : true,
     avatarUrl: user.avatarUrl ?? null,
     mustChangePassword: user.mustChangePassword,
     createdAt: user.createdAt,
@@ -116,6 +117,14 @@ export const loginService = (email, password) => new Promise(async (resolve, rej
             raw: true
         })
         if (user) {
+            // Kiểm tra tài khoản có bị khóa không
+            if (!user.isActive) {
+                return resolve({
+                    err: 1,
+                    msg: 'Tài khoản đã bị khóa. Vui lòng liên hệ Admin để được hỗ trợ.'
+                })
+            }
+
             const isCorrectPassword = bcrypt.compareSync(password, user.password)
             if (isCorrectPassword) {
                 const access_token = generateToken(user.username, user.id, user.role, user.mustChangePassword)
@@ -319,7 +328,7 @@ export const getAllUsersService = (searchQuery) => new Promise(async (resolve, r
         const users = await db.Users.findAll({
             where: whereClause,
             attributes: [
-                'id', 'username', 'email', 'role', 'avatarUrl',
+                'id', 'username', 'email', 'role', 'avatarUrl', 'isActive',
                 'kpiScore', 'kpiModelAtSignup',
                 'cpa', 'interviewScore', 'cvScore',
                 'yearsAtCompany', 'yearsExperience', 'numProjectsPrior',
@@ -726,6 +735,38 @@ export const adminDeleteUserService = (id) => new Promise(async (resolve, reject
         resolve({
             err: 0,
             msg: 'Xóa tài khoản thành công',
+        });
+    } catch (error) {
+        reject(error);
+    }
+});
+
+// Admin: Toggle trạng thái tài khoản (đóng/mở)
+export const adminToggleUserStatusService = (id, isActive) => new Promise(async (resolve, reject) => {
+    try {
+        const user = await db.Users.findByPk(id);
+        if (!user) {
+            return resolve({
+                err: 1,
+                msg: 'User không tồn tại',
+            });
+        }
+
+        // Không cho phép khóa chính tài khoản Admin đang thao tác
+        if (user.role === 'Admin' && isActive === false) {
+            return resolve({
+                err: 1,
+                msg: 'Không thể khóa tài khoản Admin',
+            });
+        }
+
+        await user.update({ isActive: Boolean(isActive) });
+        await user.reload();
+
+        resolve({
+            err: 0,
+            msg: isActive ? 'Mở khóa tài khoản thành công' : 'Khóa tài khoản thành công',
+            response: buildPublicUserProfile(user),
         });
     } catch (error) {
         reject(error);

@@ -19,3 +19,7 @@ timestamp_utc,user_id,kpi,model_used,event
 2026-04-13T08:40:17.570264+00:00,user_demo_001,0.99994,B,quarterly_update
 2026-04-13T08:56:28.200857+00:00,user_demo_001,0.017648,A,account_created_cold
 2026-04-13T08:56:28.201860+00:00,user_demo_001,0.99994,B,quarterly_update
+2026-05-03T08:28:46.376926+00:00,user_demo_001,0.017648,A,account_created_cold
+2026-05-03T08:28:46.377926+00:00,user_demo_001,0.99994,B,quarterly_update
+2026-05-03T14:58:41.504366+00:00,user_demo_001,0.017648,A,account_created_cold
+2026-05-03T14:58:41.504366+00:00,user_demo_001,0.99994,B,quarterly_update

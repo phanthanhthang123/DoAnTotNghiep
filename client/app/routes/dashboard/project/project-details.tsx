@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router';
 import type { Task } from '@/type';
-import { useProjectQueryById, useUpdateProjectTitleMutation, useUpdateProjectDescriptionMutation, useAddMemberToProjectMutation, useRemoveMemberFromProjectMutation } from '@/hooks/use-project';
+import { useProjectQueryById, useUpdateProjectTitleMutation, useUpdateProjectDescriptionMutation, useAddMemberToProjectMutation, useRemoveMemberFromProjectMutation, useProjectDelayPrediction } from '@/hooks/use-project';
+import type { PredictionResult, ModelEvaluation } from '@/hooks/use-project';
 import type { TaskStatus } from '@/type';
 import { Loader } from '@/components/loader';
 import { getProjectProgress } from '@/lib';
+import { fetchData } from '@/lib/fetch-utlis';
 import { BackButton } from '@/components/back-button';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -15,14 +17,14 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useArchiveTaskMutation } from '@/hooks/use-task';
-import { Archive, CheckSquare, Users, Edit, Trash2, UserPlus, CalendarDays, Search, ChevronDown, ChevronRight, ExternalLink, Copy, Github } from 'lucide-react';
+import { Archive, CheckSquare, Users, Edit, Trash2, UserPlus, CalendarDays, Search, ChevronDown, ChevronRight, ExternalLink, Copy, Github, BrainCircuit, AlertTriangle, Lightbulb, ShieldCheck, ShieldAlert, Loader2, BarChart3, Target, TrendingUp, Activity } from 'lucide-react';
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
+    Pagination,
+    PaginationContent,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
 } from '@/components/ui/pagination';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
@@ -61,6 +63,8 @@ const ProjectDetails = () => {
     const [statusPages, setStatusPages] = useState<Record<string, number>>({});
     const [taskPage, setTaskPage] = useState(1);
     const { user } = useAuth();
+    const [isPredictionDialogOpen, setIsPredictionDialogOpen] = useState(false);
+    const [predictionResult, setPredictionResult] = useState<PredictionResult | null>(null);
 
     // All hooks must be called before any conditional returns
     const { data, isLoading, error } = useProjectQueryById(projectId!);
@@ -70,16 +74,18 @@ const ProjectDetails = () => {
     const { mutate: updateDescription, isPending: isUpdatingDescription } = useUpdateProjectDescriptionMutation();
     const { mutate: addMember, isPending: isAddingMember } = useAddMemberToProjectMutation();
     const { mutate: removeMember, isPending: isRemovingMember } = useRemoveMemberFromProjectMutation();
+    const [isPredictingLocal, setIsPredictingLocal] = useState(false);
+    // const { mutate: predictDelay, isPending: isPredicting } = useProjectDelayPrediction();
     const { data: usersData, isLoading: isLoadingUsers } = useGetAllUsersQuery(searchQuery);
-    
+
     // Extract project and tasks early (before any hooks that depend on them)
     const project = data?.project;
     const tasks = data?.tasks || [];
-    
+
     // Filter out archived tasks from main view
     const activeTasks = useMemo(() => tasks?.filter(task => !task.isArchived) || [], [tasks]);
     const archivedTasks = useMemo(() => tasks?.filter(task => task.isArchived) || [], [tasks]);
-    
+
     // Filter tasks based on search query
     const filteredActiveTasks = useMemo(() => {
         if (!taskSearchQuery.trim()) {
@@ -92,7 +98,7 @@ const ProjectDetails = () => {
             return title.includes(query) || description.includes(query);
         });
     }, [activeTasks, taskSearchQuery]);
-    
+
     const filteredArchivedTasks = useMemo(() => {
         if (!taskSearchQuery.trim()) {
             return archivedTasks;
@@ -175,9 +181,9 @@ const ProjectDetails = () => {
             [status]: page
         }));
     };
-    
+
     const projectProgess = useMemo(() => getProjectProgress(activeTasks as { status: TaskStatus }[]), [activeTasks]);
-    
+
     // Get project statistics
     const totalTasksInProject = useMemo(() => tasks?.length || 0, [tasks]);
     const totalMembersInProject = useMemo(() => (project as any)?.members?.length || 0, [project]);
@@ -185,8 +191,8 @@ const ProjectDetails = () => {
     // Check if current user is leader - must be called before early return
     const isCurrentUserLeader = useMemo(() => {
         if (!user || !project) return false;
-        const leaderId = typeof (project as any).leader_id === 'string' 
-            ? (project as any).leader_id 
+        const leaderId = typeof (project as any).leader_id === 'string'
+            ? (project as any).leader_id
             : (project as any).leader?.id || (project as any).leader_id;
         if (leaderId === user.id || (project as any).created_by === user.id) return true;
         return (project as any)?.members?.some((member: any) => {
@@ -199,7 +205,7 @@ const ProjectDetails = () => {
     const availableUsers = useMemo(() => {
         const users = (usersData as any)?.response || [];
         if (!users || users.length === 0 || !project) return [];
-        const existingMemberIds = ((project as any)?.members || []).map((m: any) => 
+        const existingMemberIds = ((project as any)?.members || []).map((m: any) =>
             typeof m.user === 'string' ? m.user : m.user?.id || m.user_id
         );
         return users.filter((user: any) => !existingMemberIds.includes(user.id));
@@ -336,6 +342,26 @@ const ProjectDetails = () => {
         navigate(`/workspaces/${workspaceId}/projects/${projectId}/tasks/${taskId}`);
     }
 
+    const handlePredictDelay = async () => {
+        if (!projectId) return;
+        try {
+            setIsPredictingLocal(true);
+            console.log("Calling API manually...");
+            const data = await fetchData<PredictionResult>(`/project/${projectId}/predict-delay`);
+            console.log("Prediction success data:", data);
+            toast.success("Phân tích hoàn tất!");
+            setPredictionResult(data);
+            setIsPredictionDialogOpen(true);
+            // Invalidate project query to refresh stored prediction card in UI
+            queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+        } catch (err: any) {
+            console.error("Prediction error:", err);
+            toast.error("Lỗi: " + (err?.response?.data?.msg || err.message));
+        } finally {
+            setIsPredictingLocal(false);
+        }
+    };
+
     const handleUnarchiveTask = (taskId: string, e: React.MouseEvent) => {
         e.stopPropagation(); // Prevent navigation when clicking unarchive button
         archiveTask({ taskId }, {
@@ -453,7 +479,7 @@ const ProjectDetails = () => {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div className='space-y-2'>
                             {isEditingDescription ? (
                                 <>
@@ -517,10 +543,47 @@ const ProjectDetails = () => {
                             </div>
                         </Card>
 
+                        {/* Stored AI Prediction Card */}
+                        {(project as any)?.prediction && (
+                            <Card className={cn(
+                                "p-4 border-l-4",
+                                (project as any).prediction.delay_risk_level === 'High' ? "border-l-red-500 bg-red-50/30 dark:bg-red-950/10" :
+                                (project as any).prediction.delay_risk_level === 'Medium' ? "border-l-amber-500 bg-amber-50/30 dark:bg-amber-950/10" :
+                                "border-l-green-500 bg-green-50/30 dark:bg-green-950/10"
+                            )}>
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Phân tích rủi ro gần nhất</span>
+                                        <Badge variant="outline" className={cn(
+                                            "text-[10px] py-0 px-1.5 font-bold",
+                                            (project as any).prediction.delay_risk_level === 'High' ? "bg-red-100 text-red-800 border-red-200" :
+                                            (project as any).prediction.delay_risk_level === 'Medium' ? "bg-amber-100 text-amber-800 border-amber-200" :
+                                            "bg-green-100 text-green-800 border-green-200"
+                                        )}>
+                                            {(project as any).prediction.delay_risk_level === 'High' ? 'Rủi ro Cao' :
+                                             (project as any).prediction.delay_risk_level === 'Medium' ? 'Trung bình' : 'Rủi ro Thấp'}
+                                        </Badge>
+                                    </div>
+                                    <div className="text-xs space-y-1">
+                                        {(project as any).prediction.estimated_completion_date && (
+                                            <p className="text-muted-foreground">
+                                                Hoàn thành dự kiến: <span className="font-medium text-foreground">{format(new Date((project as any).prediction.estimated_completion_date), "MMM d, yyyy")}</span>
+                                            </p>
+                                        )}
+                                        {(project as any).prediction.delay_reason && (project as any).prediction.delay_reason !== 'N/A' && (
+                                            <p className="text-[11px] italic text-muted-foreground line-clamp-2" title={(project as any).prediction.delay_reason}>
+                                                Nguyên nhân: {(project as any).prediction.delay_reason}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </Card>
+                        )}
+
                         {/* Action Buttons */}
                         <div className='flex flex-col gap-2'>
                             {isCurrentUserLeader && (
-                                <Button 
+                                <Button
                                     variant="outline"
                                     onClick={() => setIsAddMemberDialogOpen(true)}
                                     className="w-full"
@@ -533,6 +596,21 @@ const ProjectDetails = () => {
                                 <CheckSquare className="mr-2 size-4" />
                                 Thêm Task
                             </Button>
+                            {isCurrentUserLeader && (
+                                <Button
+                                    variant="outline"
+                                    onClick={handlePredictDelay}
+                                    disabled={isPredictingLocal}
+                                    className="w-full border-amber-500/50 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:text-amber-400 dark:hover:bg-amber-950 dark:hover:text-amber-300"
+                                >
+                                    {isPredictingLocal ? (
+                                        <Loader2 className="mr-2 size-4 animate-spin" />
+                                    ) : (
+                                        <BrainCircuit className="mr-2 size-4" />
+                                    )}
+                                    {isPredictingLocal ? 'Đang phân tích...' : 'Đánh giá rủi ro (AI)'}
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -540,7 +618,7 @@ const ProjectDetails = () => {
 
             {/* Project Statistics */}
             <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
-                <Card 
+                <Card
                     className="cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all group py-3"
                     onClick={() => setIsTaskDialogOpen(true)}
                 >
@@ -558,7 +636,7 @@ const ProjectDetails = () => {
                     </CardContent>
                 </Card>
 
-                <Card 
+                <Card
                     className="cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all group py-3"
                     onClick={() => setIsMemberDialogOpen(true)}
                 >
@@ -645,8 +723,8 @@ const ProjectDetails = () => {
                                                         task.status === 'Done'
                                                             ? "bg-green-100 text-green-800"
                                                             : task.status === 'In Progress'
-                                                            ? "bg-blue-100 text-blue-800"
-                                                            : "bg-gray-100 text-gray-800"
+                                                                ? "bg-blue-100 text-blue-800"
+                                                                : "bg-gray-100 text-gray-800"
                                                     }
                                                 >
                                                     {task.status === 'To Do' ? 'Chưa Làm' : task.status === 'In Progress' ? 'Đang Làm' : 'Hoàn Thành'}
@@ -657,8 +735,8 @@ const ProjectDetails = () => {
                                                         task.priority === 'High'
                                                             ? "bg-red-100 text-red-800"
                                                             : task.priority === 'Medium'
-                                                            ? "bg-yellow-100 text-yellow-800"
-                                                            : "bg-gray-100 text-gray-800"
+                                                                ? "bg-yellow-100 text-yellow-800"
+                                                                : "bg-gray-100 text-gray-800"
                                                     }
                                                 >
                                                     {task.priority}
@@ -698,7 +776,7 @@ const ProjectDetails = () => {
                                 {(project as any)?.members?.map((member: any, index: number) => {
                                     const memberUser = typeof member.user === 'object' ? member.user : null;
                                     const memberUserId = typeof member.user === 'string' ? member.user : member.user?.id || member.user_id;
-                                    
+
                                     // Role hệ thống gốc trên user (có thể dạng admin/kleader/member hoặc Admin/Leader/Member)
                                     const systemRoleRaw = (memberUser?.role as string | undefined) || '';
                                     // Role trong project (Leader/Manager/Developer/leader/manager/...)
@@ -709,13 +787,13 @@ const ProjectDetails = () => {
 
                                     // Xác định leader để chặn nút xoá
                                     const isLeader =
-                                      projectRole === 'leader' ||
-                                      (project as any).leader_id === memberUserId ||
-                                      systemRole === 'leader' ||
-                                      systemRole === 'kleader';
+                                        projectRole === 'leader' ||
+                                        (project as any).leader_id === memberUserId ||
+                                        systemRole === 'leader' ||
+                                        systemRole === 'kleader';
 
                                     const canDelete = isCurrentUserLeader && !isLeader && memberUserId !== user?.id;
-                                    
+
                                     const getLastNameInitial = (username: string) => {
                                         if (!username || username.trim() === "") return "";
                                         const names = username.trim().split(" ").filter(name => name.length > 0);
@@ -723,7 +801,7 @@ const ProjectDetails = () => {
                                         const lastName = names[names.length - 1];
                                         return lastName.charAt(0).toUpperCase();
                                     };
-                                    
+
                                     return (
                                         <div
                                             key={member.user_id || index}
@@ -747,14 +825,14 @@ const ProjectDetails = () => {
                                                     </p>
                                                     <Badge variant="outline" className="text-xs">
                                                         {systemRole === 'admin'
-                                                          ? 'Admin'
-                                                          : systemRole === 'leader' || systemRole === 'kleader'
-                                                          ? 'Leader'
-                                                          : systemRole === 'member'
-                                                          ? 'Member'
-                                                          : projectRole === 'leader'
-                                                          ? 'Leader'
-                                                          : 'Member'}
+                                                            ? 'Admin'
+                                                            : systemRole === 'leader' || systemRole === 'kleader'
+                                                                ? 'Leader'
+                                                                : systemRole === 'member'
+                                                                    ? 'Member'
+                                                                    : projectRole === 'leader'
+                                                                        ? 'Leader'
+                                                                        : 'Member'}
                                                     </Badge>
                                                 </div>
                                                 <p className="text-xs text-muted-foreground truncate">
@@ -821,11 +899,10 @@ const ProjectDetails = () => {
                                             <div
                                                 key={userItem.id}
                                                 onClick={() => setSelectedUserId(userItem.id)}
-                                                className={`flex items-center gap-3 p-3 rounded-md cursor-pointer border transition-colors ${
-                                                    isSelected
+                                                className={`flex items-center gap-3 p-3 rounded-md cursor-pointer border transition-colors ${isSelected
                                                         ? "bg-primary/10 border-primary"
                                                         : "hover:bg-accent border-transparent"
-                                                }`}
+                                                    }`}
                                             >
                                                 <Avatar className="size-8">
                                                     <AvatarImage src={userItem.avatarUrl || undefined} />
@@ -904,291 +981,291 @@ const ProjectDetails = () => {
 
             {/* Tasks Section */}
             <div className="space-y-4">
-              {/* Search Bar */}
-              <div className="p-4 bg-muted/30 rounded-lg border">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Tìm kiếm task..."
-                    value={taskSearchQuery}
-                    onChange={(e) => setTaskSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-              </div>
-
-              {/* Modern Status Board */}
-              <Card className="border-none shadow-none bg-transparent">
-                <CardHeader className="pb-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <CardTitle className="text-lg md:text-xl">
-                        Bảng Trạng Thái Task
-                      </CardTitle>
-                      <p className="text-xs md:text-sm text-muted-foreground">
-                        Nhìn nhanh toàn bộ luồng công việc từ Chưa Làm → Đang Làm → Hoàn Thành.
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 md:gap-4 text-xs md:text-sm">
-                      <div className="rounded-lg bg-blue-50 px-3 py-2 border border-blue-100">
-                        <p className="font-medium text-blue-800">Chưa Làm</p>
-                        <p className="text-blue-600">
-                          {tasksByStatus["To Do"]?.length || 0} task
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-amber-50 px-3 py-2 border border-amber-100">
-                        <p className="font-medium text-amber-800">Đang Làm</p>
-                        <p className="text-amber-600">
-                          {tasksByStatus["In Progress"]?.length || 0} task
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-emerald-50 px-3 py-2 border border-emerald-100">
-                        <p className="font-medium text-emerald-800">Hoàn Thành</p>
-                        <p className="text-emerald-600">
-                          {tasksByStatus["Done"]?.length || 0} task
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Bộ lọc trạng thái cho bảng */}
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="flex flex-wrap gap-2">
-                      {([
-                        { key: 'All', label: 'Tất cả' },
-                        { key: 'To Do', label: 'Chưa Làm' },
-                        { key: 'In Progress', label: 'Đang Làm' },
-                        { key: 'Done', label: 'Hoàn Thành' },
-                      ] as const).map((item) => (
-                        <Button
-                          key={item.key}
-                          type="button"
-                          size="sm"
-                          variant={taskFilter === item.key ? 'default' : 'outline'}
-                          onClick={() => setTaskFilter(item.key)}
-                          className="text-xs md:text-sm"
-                        >
-                          {item.label}
-                        </Button>
-                      ))}
-                    </div>
-                    <div className="text-xs md:text-sm text-muted-foreground">
-                      Đang hiển thị {paginatedStatusTasks.length} / {statusFilteredTasks.length} task
-                    </div>
-                  </div>
-
-                  {/* Bảng task theo trạng thái + phân trang */}
-                  <div className="rounded-xl border bg-background overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/60 border-b">
-                          <tr className="text-left">
-                            <th className="px-4 py-2 w-[60px] font-medium text-xs text-muted-foreground">
-                              ID
-                            </th>
-                            <th className="px-4 py-2 min-w-[220px] font-medium text-xs text-muted-foreground">
-                              Tiêu đề
-                            </th>
-                            <th className="px-4 py-2 min-w-[120px] font-medium text-xs text-muted-foreground">
-                              Trạng thái
-                            </th>
-                            <th className="px-4 py-2 min-w-[100px] font-medium text-xs text-muted-foreground">
-                              Ưu tiên
-                            </th>
-                            <th className="px-4 py-2 min-w-[120px] font-medium text-xs text-muted-foreground">
-                              Độ khó
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {statusFilteredTasks.length === 0 ? (
-                            <tr>
-                              <td
-                                colSpan={5}
-                                className="px-4 py-6 text-center text-sm text-muted-foreground"
-                              >
-                                Chưa có task nào phù hợp
-                              </td>
-                            </tr>
-                          ) : (
-                            paginatedStatusTasks.map((task) => (
-                              <tr
-                                key={task.id}
-                                className="cursor-pointer hover:bg-muted/60 border-b last:border-0"
-                                onClick={() => handleTaskClick(String(task.id))}
-                              >
-                                <td className="px-4 py-2 text-xs text-muted-foreground">
-                                  {task.id}
-                                </td>
-                                <td className="px-4 py-2 font-medium">
-                                  {task.title}
-                                </td>
-                                <td className="px-4 py-2">
-                                  <Badge
-                                    variant="outline"
-                                    className={cn(
-                                      "text-xs",
-                                      task.status === 'Done'
-                                        ? "bg-green-100 text-green-800"
-                                        : task.status === 'In Progress'
-                                        ? "bg-blue-100 text-blue-800"
-                                        : "bg-gray-100 text-gray-800"
-                                    )}
-                                  >
-                                    {task.status === 'To Do'
-                                      ? 'Chưa Làm'
-                                      : task.status === 'In Progress'
-                                      ? 'Đang Làm'
-                                      : 'Hoàn Thành'}
-                                  </Badge>
-                                </td>
-                                <td className="px-4 py-2">
-                                  <Badge
-                                    variant="outline"
-                                    className={cn(
-                                      "text-xs",
-                                      task.priority === 'High'
-                                        ? "bg-red-100 text-red-800"
-                                        : task.priority === 'Medium'
-                                        ? "bg-yellow-100 text-yellow-800"
-                                        : "bg-gray-100 text-gray-800"
-                                    )}
-                                  >
-                                    {task.priority}
-                                  </Badge>
-                                </td>
-                                <td className="px-4 py-2">
-                                  <Badge
-                                    variant="outline"
-                                    className={cn("text-xs bg-slate-100 text-slate-800")}
-                                  >
-                                    {getDifficultyLabel((task as any).difficulty)}
-                                  </Badge>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Phân trang cho bảng */}
-                    {statusFilteredTasks.length > 0 && (
-                      <div className="flex flex-col items-center gap-3 px-4 py-3 border-t bg-muted/40">
-                        <Pagination>
-                          <PaginationContent className="gap-2">
-                            <PaginationItem>
-                              <PaginationPrevious
-                                href="#"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  if (taskPage > 1) {
-                                    setTaskPage(taskPage - 1);
-                                  }
-                                }}
-                                className={cn(
-                                  "min-w-[90px] h-8 text-xs",
-                                  taskPage === 1
-                                    ? "pointer-events-none opacity-50 cursor-not-allowed"
-                                    : "hover:bg-accent hover:text-accent-foreground transition-colors"
-                                )}
-                              />
-                            </PaginationItem>
-
-                            {Array.from({ length: totalTaskPages }, (_, i) => i + 1).map((page) => {
-                              if (
-                                page === 1 ||
-                                page === totalTaskPages ||
-                                (page >= taskPage - 1 && page <= taskPage + 1)
-                              ) {
-                                return (
-                                  <PaginationItem key={page}>
-                                    <PaginationLink
-                                      href="#"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        setTaskPage(page);
-                                      }}
-                                      isActive={taskPage === page}
-                                      className={cn(
-                                        "min-w-[32px] h-8 text-xs flex items-center justify-center",
-                                        taskPage === page
-                                          ? "bg-primary text-primary-foreground font-semibold"
-                                          : "hover:bg-accent hover:text-accent-foreground transition-colors"
-                                      )}
-                                    >
-                                      {page}
-                                    </PaginationLink>
-                                  </PaginationItem>
-                                );
-                              } else if (page === taskPage - 2 || page === taskPage + 2) {
-                                return (
-                                  <PaginationItem key={page}>
-                                    <span className="px-1 py-1 text-muted-foreground text-xs">...</span>
-                                  </PaginationItem>
-                                );
-                              }
-                              return null;
-                            })}
-
-                            <PaginationItem>
-                              <PaginationNext
-                                href="#"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  if (taskPage < totalTaskPages) {
-                                    setTaskPage(taskPage + 1);
-                                  }
-                                }}
-                                className={cn(
-                                  "min-w-[90px] h-8 text-xs",
-                                  taskPage === totalTaskPages
-                                    ? "pointer-events-none opacity-50 cursor-not-allowed"
-                                    : "hover:bg-accent hover:text-accent-foreground transition-colors"
-                                )}
-                              />
-                            </PaginationItem>
-                          </PaginationContent>
-                        </Pagination>
-
-                        <div className="text-xs text-muted-foreground">
-                          Trang {taskPage} / {totalTaskPages} • Hiển thị{" "}
-                          {(taskPage - 1) * TASKS_PER_PAGE_TABLE + 1}
-                          -
-                          {Math.min(taskPage * TASKS_PER_PAGE_TABLE, statusFilteredTasks.length)}{" "}
-                          trong tổng số {statusFilteredTasks.length} task
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Archived Tasks giữ nguyên */}
-                  {filteredArchivedTasks.length > 0 && (
-                    <div className="border rounded-lg overflow-hidden mt-4">
-                      <div className="flex items-center gap-2 px-4 py-3 bg-muted/50">
-                        <Archive className="size-4 text-muted-foreground" />
-                        <h2 className="text-lg font-semibold flex-1">
-                          Đã Lưu Trữ
-                        </h2>
-                        <Badge variant="outline" className="ml-auto">
-                          {filteredArchivedTasks.length}{" "}
-                          {filteredArchivedTasks.length === 1 ? "task" : "tasks"}
-                        </Badge>
-                      </div>
-                      <div className="p-4">
-                        <ArchivedTaskColumn
-                          title="Task Đã Lưu Trữ"
-                          tasks={filteredArchivedTasks}
-                          onTaskClick={handleTaskClick}
-                          onUnarchive={handleUnarchiveTask}
-                          isArchiving={isArchiving}
+                {/* Search Bar */}
+                <div className="p-4 bg-muted/30 rounded-lg border">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Tìm kiếm task..."
+                            value={taskSearchQuery}
+                            onChange={(e) => setTaskSearchQuery(e.target.value)}
+                            className="pl-9"
                         />
-                      </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                </div>
+
+                {/* Modern Status Board */}
+                <Card className="border-none shadow-none bg-transparent">
+                    <CardHeader className="pb-4">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <CardTitle className="text-lg md:text-xl">
+                                    Bảng Trạng Thái Task
+                                </CardTitle>
+                                <p className="text-xs md:text-sm text-muted-foreground">
+                                    Nhìn nhanh toàn bộ luồng công việc từ Chưa Làm → Đang Làm → Hoàn Thành.
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 md:gap-4 text-xs md:text-sm">
+                                <div className="rounded-lg bg-blue-50 px-3 py-2 border border-blue-100">
+                                    <p className="font-medium text-blue-800">Chưa Làm</p>
+                                    <p className="text-blue-600">
+                                        {tasksByStatus["To Do"]?.length || 0} task
+                                    </p>
+                                </div>
+                                <div className="rounded-lg bg-amber-50 px-3 py-2 border border-amber-100">
+                                    <p className="font-medium text-amber-800">Đang Làm</p>
+                                    <p className="text-amber-600">
+                                        {tasksByStatus["In Progress"]?.length || 0} task
+                                    </p>
+                                </div>
+                                <div className="rounded-lg bg-emerald-50 px-3 py-2 border border-emerald-100">
+                                    <p className="font-medium text-emerald-800">Hoàn Thành</p>
+                                    <p className="text-emerald-600">
+                                        {tasksByStatus["Done"]?.length || 0} task
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {/* Bộ lọc trạng thái cho bảng */}
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div className="flex flex-wrap gap-2">
+                                {([
+                                    { key: 'All', label: 'Tất cả' },
+                                    { key: 'To Do', label: 'Chưa Làm' },
+                                    { key: 'In Progress', label: 'Đang Làm' },
+                                    { key: 'Done', label: 'Hoàn Thành' },
+                                ] as const).map((item) => (
+                                    <Button
+                                        key={item.key}
+                                        type="button"
+                                        size="sm"
+                                        variant={taskFilter === item.key ? 'default' : 'outline'}
+                                        onClick={() => setTaskFilter(item.key)}
+                                        className="text-xs md:text-sm"
+                                    >
+                                        {item.label}
+                                    </Button>
+                                ))}
+                            </div>
+                            <div className="text-xs md:text-sm text-muted-foreground">
+                                Đang hiển thị {paginatedStatusTasks.length} / {statusFilteredTasks.length} task
+                            </div>
+                        </div>
+
+                        {/* Bảng task theo trạng thái + phân trang */}
+                        <div className="rounded-xl border bg-background overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-muted/60 border-b">
+                                        <tr className="text-left">
+                                            <th className="px-4 py-2 w-[60px] font-medium text-xs text-muted-foreground">
+                                                ID
+                                            </th>
+                                            <th className="px-4 py-2 min-w-[220px] font-medium text-xs text-muted-foreground">
+                                                Tiêu đề
+                                            </th>
+                                            <th className="px-4 py-2 min-w-[120px] font-medium text-xs text-muted-foreground">
+                                                Trạng thái
+                                            </th>
+                                            <th className="px-4 py-2 min-w-[100px] font-medium text-xs text-muted-foreground">
+                                                Ưu tiên
+                                            </th>
+                                            <th className="px-4 py-2 min-w-[120px] font-medium text-xs text-muted-foreground">
+                                                Độ khó
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {statusFilteredTasks.length === 0 ? (
+                                            <tr>
+                                                <td
+                                                    colSpan={5}
+                                                    className="px-4 py-6 text-center text-sm text-muted-foreground"
+                                                >
+                                                    Chưa có task nào phù hợp
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            paginatedStatusTasks.map((task) => (
+                                                <tr
+                                                    key={task.id}
+                                                    className="cursor-pointer hover:bg-muted/60 border-b last:border-0"
+                                                    onClick={() => handleTaskClick(String(task.id))}
+                                                >
+                                                    <td className="px-4 py-2 text-xs text-muted-foreground">
+                                                        {task.id}
+                                                    </td>
+                                                    <td className="px-4 py-2 font-medium">
+                                                        {task.title}
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={cn(
+                                                                "text-xs",
+                                                                task.status === 'Done'
+                                                                    ? "bg-green-100 text-green-800"
+                                                                    : task.status === 'In Progress'
+                                                                        ? "bg-blue-100 text-blue-800"
+                                                                        : "bg-gray-100 text-gray-800"
+                                                            )}
+                                                        >
+                                                            {task.status === 'To Do'
+                                                                ? 'Chưa Làm'
+                                                                : task.status === 'In Progress'
+                                                                    ? 'Đang Làm'
+                                                                    : 'Hoàn Thành'}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={cn(
+                                                                "text-xs",
+                                                                task.priority === 'High'
+                                                                    ? "bg-red-100 text-red-800"
+                                                                    : task.priority === 'Medium'
+                                                                        ? "bg-yellow-100 text-yellow-800"
+                                                                        : "bg-gray-100 text-gray-800"
+                                                            )}
+                                                        >
+                                                            {task.priority}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={cn("text-xs bg-slate-100 text-slate-800")}
+                                                        >
+                                                            {getDifficultyLabel((task as any).difficulty)}
+                                                        </Badge>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Phân trang cho bảng */}
+                            {statusFilteredTasks.length > 0 && (
+                                <div className="flex flex-col items-center gap-3 px-4 py-3 border-t bg-muted/40">
+                                    <Pagination>
+                                        <PaginationContent className="gap-2">
+                                            <PaginationItem>
+                                                <PaginationPrevious
+                                                    href="#"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        if (taskPage > 1) {
+                                                            setTaskPage(taskPage - 1);
+                                                        }
+                                                    }}
+                                                    className={cn(
+                                                        "min-w-[90px] h-8 text-xs",
+                                                        taskPage === 1
+                                                            ? "pointer-events-none opacity-50 cursor-not-allowed"
+                                                            : "hover:bg-accent hover:text-accent-foreground transition-colors"
+                                                    )}
+                                                />
+                                            </PaginationItem>
+
+                                            {Array.from({ length: totalTaskPages }, (_, i) => i + 1).map((page) => {
+                                                if (
+                                                    page === 1 ||
+                                                    page === totalTaskPages ||
+                                                    (page >= taskPage - 1 && page <= taskPage + 1)
+                                                ) {
+                                                    return (
+                                                        <PaginationItem key={page}>
+                                                            <PaginationLink
+                                                                href="#"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    setTaskPage(page);
+                                                                }}
+                                                                isActive={taskPage === page}
+                                                                className={cn(
+                                                                    "min-w-[32px] h-8 text-xs flex items-center justify-center",
+                                                                    taskPage === page
+                                                                        ? "bg-primary text-primary-foreground font-semibold"
+                                                                        : "hover:bg-accent hover:text-accent-foreground transition-colors"
+                                                                )}
+                                                            >
+                                                                {page}
+                                                            </PaginationLink>
+                                                        </PaginationItem>
+                                                    );
+                                                } else if (page === taskPage - 2 || page === taskPage + 2) {
+                                                    return (
+                                                        <PaginationItem key={page}>
+                                                            <span className="px-1 py-1 text-muted-foreground text-xs">...</span>
+                                                        </PaginationItem>
+                                                    );
+                                                }
+                                                return null;
+                                            })}
+
+                                            <PaginationItem>
+                                                <PaginationNext
+                                                    href="#"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        if (taskPage < totalTaskPages) {
+                                                            setTaskPage(taskPage + 1);
+                                                        }
+                                                    }}
+                                                    className={cn(
+                                                        "min-w-[90px] h-8 text-xs",
+                                                        taskPage === totalTaskPages
+                                                            ? "pointer-events-none opacity-50 cursor-not-allowed"
+                                                            : "hover:bg-accent hover:text-accent-foreground transition-colors"
+                                                    )}
+                                                />
+                                            </PaginationItem>
+                                        </PaginationContent>
+                                    </Pagination>
+
+                                    <div className="text-xs text-muted-foreground">
+                                        Trang {taskPage} / {totalTaskPages} • Hiển thị{" "}
+                                        {(taskPage - 1) * TASKS_PER_PAGE_TABLE + 1}
+                                        -
+                                        {Math.min(taskPage * TASKS_PER_PAGE_TABLE, statusFilteredTasks.length)}{" "}
+                                        trong tổng số {statusFilteredTasks.length} task
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Archived Tasks giữ nguyên */}
+                        {filteredArchivedTasks.length > 0 && (
+                            <div className="border rounded-lg overflow-hidden mt-4">
+                                <div className="flex items-center gap-2 px-4 py-3 bg-muted/50">
+                                    <Archive className="size-4 text-muted-foreground" />
+                                    <h2 className="text-lg font-semibold flex-1">
+                                        Đã Lưu Trữ
+                                    </h2>
+                                    <Badge variant="outline" className="ml-auto">
+                                        {filteredArchivedTasks.length}{" "}
+                                        {filteredArchivedTasks.length === 1 ? "task" : "tasks"}
+                                    </Badge>
+                                </div>
+                                <div className="p-4">
+                                    <ArchivedTaskColumn
+                                        title="Task Đã Lưu Trữ"
+                                        tasks={filteredArchivedTasks}
+                                        onTaskClick={handleTaskClick}
+                                        onUnarchive={handleUnarchiveTask}
+                                        isArchiving={isArchiving}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
 
 
@@ -1199,6 +1276,112 @@ const ProjectDetails = () => {
                 projectId={projectId!}
                 projectMembers={(project as any)?.members || []}
             />
+
+            {/* AI Prediction Dialog — Premium */}
+            <Dialog open={isPredictionDialogOpen} onOpenChange={setIsPredictionDialogOpen}>
+                <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto p-0">
+                    {/* Gradient Header */}
+                    <div className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 px-6 py-5 rounded-t-lg">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2 text-white text-lg">
+                                <BrainCircuit className="size-6" />
+                                Đánh giá Rủi ro Dự án (AI)
+                            </DialogTitle>
+                            <DialogDescription className="text-white/80 text-sm">
+                                Kết quả phân tích dựa trên thuật toán Random Forest — Đánh giá mô hình chi tiết
+                            </DialogDescription>
+                        </DialogHeader>
+                    </div>
+
+                    {predictionResult?.prediction && (
+                        <div className="space-y-5 px-6 py-5">
+
+                            {/* ── 1. Risk Level ── */}
+                            <div className="flex items-center justify-center p-5 rounded-xl border-2 shadow-sm" style={{
+                                borderColor: predictionResult.prediction.risk_level === 'High' ? '#ef4444' : predictionResult.prediction.risk_level === 'Medium' ? '#f59e0b' : '#22c55e',
+                                background: predictionResult.prediction.risk_level === 'High' ? 'linear-gradient(135deg,#fef2f2,#fee2e2)' : predictionResult.prediction.risk_level === 'Medium' ? 'linear-gradient(135deg,#fffbeb,#fef3c7)' : 'linear-gradient(135deg,#f0fdf4,#dcfce7)'
+                            }}>
+                                <div className="text-center">
+                                    {predictionResult.prediction.risk_level === 'High' ? <ShieldAlert className="size-12 text-red-500 mx-auto mb-2" /> : predictionResult.prediction.risk_level === 'Medium' ? <AlertTriangle className="size-12 text-amber-500 mx-auto mb-2" /> : <ShieldCheck className="size-12 text-green-500 mx-auto mb-2" />}
+                                    <p className="text-xl font-bold" style={{ color: predictionResult.prediction.risk_level === 'High' ? '#dc2626' : predictionResult.prediction.risk_level === 'Medium' ? '#d97706' : '#16a34a' }}>
+                                        {predictionResult.prediction.risk_level === 'High' ? 'Rủi ro CAO — Có nguy cơ trễ hạn' : predictionResult.prediction.risk_level === 'Medium' ? 'Rủi ro TRUNG BÌNH — Cần chú ý' : 'Rủi ro THẤP — Tiến độ ổn định'}
+                                    </p>
+                                    {predictionResult.prediction.model_evaluation?.prediction_confidence && (
+                                        <p className="text-sm mt-1 font-medium" style={{ color: predictionResult.prediction.risk_level === 'High' ? '#b91c1c' : predictionResult.prediction.risk_level === 'Medium' ? '#b45309' : '#15803d' }}>
+                                            Độ tin cậy dự đoán: {predictionResult.prediction.model_evaluation.prediction_confidence.confidence_percent}%
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* ── 2. Prediction Confidence Breakdown ── */}
+                            {predictionResult.prediction.model_evaluation?.prediction_confidence && (
+                                <div className="rounded-xl border p-4 bg-gradient-to-br from-background to-muted/20 shadow-sm">
+                                    <p className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                        <Target className="size-4 text-violet-500" />
+                                        Xác suất từng mức rủi ro (lần dự đoán này)
+                                    </p>
+                                    <div className="space-y-2">
+                                        {Object.entries(predictionResult.prediction.model_evaluation.prediction_confidence.probabilities).map(([label, prob]) => {
+                                            const pct = Math.round(prob * 100);
+                                            const color = label === 'High' ? '#ef4444' : label === 'Medium' ? '#f59e0b' : '#22c55e';
+                                            const isPredicted = label === predictionResult.prediction.model_evaluation?.prediction_confidence.predicted_class;
+                                            const ringClass = label === 'High' ? 'ring-red-500' : label === 'Medium' ? 'ring-amber-500' : 'ring-green-500';
+                                            return (
+                                                <div key={label} className={cn("rounded-lg p-2 transition-all", isPredicted ? `ring-2 ring-offset-1 bg-muted/40 ${ringClass}` : "")}>
+                                                    <div className="flex items-center justify-between text-xs mb-1">
+                                                        <span className="font-medium">{label === 'Low' ? '🟢 Thấp' : label === 'Medium' ? '🟡 Trung bình' : '🔴 Cao'} {isPredicted && '← Dự đoán'}</span>
+                                                        <span className="font-bold">{pct}%</span>
+                                                    </div>
+                                                    <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                                                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: color }} />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+
+
+                            {/* ── 7. Input Summary ── */}
+                            <div className="rounded-xl border p-4 bg-muted/30 shadow-sm">
+                                <p className="text-xs font-semibold mb-2 text-muted-foreground">📋 Dữ liệu đầu vào (tại thời điểm phân tích)</p>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                                    <span>Thành viên: <strong>{predictionResult.prediction.input_summary.team_size}</strong></span>
+                                    <span>Tổng task: <strong>{predictionResult.prediction.input_summary.total_tasks}</strong></span>
+                                    <span>Thời gian đã qua: <strong>{Math.round(predictionResult.prediction.input_summary.elapsed_time_ratio * 100)}%</strong></span>
+                                    <span>Hoàn thành: <strong>{Math.round(predictionResult.prediction.input_summary.task_completion_ratio * 100)}%</strong></span>
+                                    <span>Task quá hạn: <strong className="text-red-600">{predictionResult.prediction.input_summary.overdue_tasks_count}</strong></span>
+                                    <span>Task khó còn lại: <strong className="text-orange-600">{predictionResult.prediction.input_summary.remaining_hard_tasks}</strong></span>
+                                </div>
+                            </div>
+
+                            {/* ── 8. Suggestions ── */}
+                            <div className="space-y-3">
+                                <p className="text-sm font-semibold flex items-center gap-1.5">
+                                    <Lightbulb className="size-4 text-amber-500" />
+                                    Nguyên nhân & Gợi ý hành động
+                                </p>
+                                {predictionResult.prediction.suggestions.map((s, idx) => (
+                                    <div key={idx} className="rounded-xl border p-3 space-y-1.5 hover:shadow-md transition-shadow">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-medium text-foreground">{s.description}</p>
+                                            <Badge variant="outline" className="text-[10px] shrink-0 ml-2">
+                                                Ảnh hưởng: {Math.round(s.importance * 100)}%
+                                            </Badge>
+                                        </div>
+                                        <p className="text-xs text-primary bg-primary/5 rounded-lg p-2.5">
+                                            💡 {s.suggestion}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     )
 };
@@ -1275,13 +1458,13 @@ const TaskColumn = ({ title, tasks, onTaskClick, isFullWidth = false }: TaskColu
                                                     }}
                                                     className={cn(
                                                         "min-w-[80px] h-8 text-xs",
-                                                        currentPage === 1 
-                                                            ? "pointer-events-none opacity-50 cursor-not-allowed" 
+                                                        currentPage === 1
+                                                            ? "pointer-events-none opacity-50 cursor-not-allowed"
                                                             : "hover:bg-accent hover:text-accent-foreground transition-colors"
                                                     )}
                                                 />
                                             </PaginationItem>
-                                            
+
                                             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                                                 if (
                                                     page === 1 ||
@@ -1299,8 +1482,8 @@ const TaskColumn = ({ title, tasks, onTaskClick, isFullWidth = false }: TaskColu
                                                                 isActive={currentPage === page}
                                                                 className={cn(
                                                                     "min-w-[32px] h-8 text-xs flex items-center justify-center",
-                                                                    currentPage === page 
-                                                                        ? "bg-primary text-primary-foreground font-semibold" 
+                                                                    currentPage === page
+                                                                        ? "bg-primary text-primary-foreground font-semibold"
                                                                         : "hover:bg-accent hover:text-accent-foreground transition-colors"
                                                                 )}
                                                             >
@@ -1317,7 +1500,7 @@ const TaskColumn = ({ title, tasks, onTaskClick, isFullWidth = false }: TaskColu
                                                 }
                                                 return null;
                                             })}
-                                            
+
                                             <PaginationItem>
                                                 <PaginationNext
                                                     href="#"
@@ -1329,15 +1512,15 @@ const TaskColumn = ({ title, tasks, onTaskClick, isFullWidth = false }: TaskColu
                                                     }}
                                                     className={cn(
                                                         "min-w-[80px] h-8 text-xs",
-                                                        currentPage === totalPages 
-                                                            ? "pointer-events-none opacity-50 cursor-not-allowed" 
+                                                        currentPage === totalPages
+                                                            ? "pointer-events-none opacity-50 cursor-not-allowed"
                                                             : "hover:bg-accent hover:text-accent-foreground transition-colors"
                                                     )}
                                                 />
                                             </PaginationItem>
                                         </PaginationContent>
                                     </Pagination>
-                                    
+
                                     <div className="text-xs text-muted-foreground">
                                         Trang {currentPage}/{totalPages}
                                     </div>
@@ -1394,13 +1577,13 @@ const TaskColumn = ({ title, tasks, onTaskClick, isFullWidth = false }: TaskColu
                                             }}
                                             className={cn(
                                                 "min-w-[100px]",
-                                                currentPage === 1 
-                                                    ? "pointer-events-none opacity-50 cursor-not-allowed" 
+                                                currentPage === 1
+                                                    ? "pointer-events-none opacity-50 cursor-not-allowed"
                                                     : "hover:bg-accent hover:text-accent-foreground transition-colors"
                                             )}
                                         />
                                     </PaginationItem>
-                                    
+
                                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                                         if (
                                             page === 1 ||
@@ -1418,8 +1601,8 @@ const TaskColumn = ({ title, tasks, onTaskClick, isFullWidth = false }: TaskColu
                                                         isActive={currentPage === page}
                                                         className={cn(
                                                             "min-w-[40px] h-10 flex items-center justify-center",
-                                                            currentPage === page 
-                                                                ? "bg-primary text-primary-foreground font-semibold" 
+                                                            currentPage === page
+                                                                ? "bg-primary text-primary-foreground font-semibold"
                                                                 : "hover:bg-accent hover:text-accent-foreground transition-colors"
                                                         )}
                                                     >
@@ -1436,7 +1619,7 @@ const TaskColumn = ({ title, tasks, onTaskClick, isFullWidth = false }: TaskColu
                                         }
                                         return null;
                                     })}
-                                    
+
                                     <PaginationItem>
                                         <PaginationNext
                                             href="#"
@@ -1448,15 +1631,15 @@ const TaskColumn = ({ title, tasks, onTaskClick, isFullWidth = false }: TaskColu
                                             }}
                                             className={cn(
                                                 "min-w-[100px]",
-                                                currentPage === totalPages 
-                                                    ? "pointer-events-none opacity-50 cursor-not-allowed" 
+                                                currentPage === totalPages
+                                                    ? "pointer-events-none opacity-50 cursor-not-allowed"
                                                     : "hover:bg-accent hover:text-accent-foreground transition-colors"
                                             )}
                                         />
                                     </PaginationItem>
                                 </PaginationContent>
                             </Pagination>
-                            
+
                             {/* Results info */}
                             <div className="text-sm text-muted-foreground">
                                 Trang {currentPage} / {totalPages} • Hiển thị {startIndex + 1}-{Math.min(endIndex, tasks.length)} trong tổng số {tasks.length} task
@@ -1482,10 +1665,10 @@ interface TaskStatusGroupProps {
 
 const TASKS_PER_PAGE_STATUS = 3;
 
-const TaskStatusGroup = ({ 
-    status, 
-    statusLabel, 
-    tasks, 
+const TaskStatusGroup = ({
+    status,
+    statusLabel,
+    tasks,
     onTaskClick,
     expandedStatuses,
     statusPages,
@@ -1494,7 +1677,7 @@ const TaskStatusGroup = ({
 }: TaskStatusGroupProps) => {
     const isExpanded = expandedStatuses[status] !== false;
     const currentPage = statusPages[status] || 1;
-    
+
     const totalPages = Math.ceil(tasks.length / TASKS_PER_PAGE_STATUS);
     const startIndex = (currentPage - 1) * TASKS_PER_PAGE_STATUS;
     const endIndex = startIndex + TASKS_PER_PAGE_STATUS;
@@ -1516,7 +1699,7 @@ const TaskStatusGroup = ({
     return (
         <div className="border rounded-lg w-full">
             {/* Status Header - Clickable */}
-            <div 
+            <div
                 className="flex items-center gap-2 px-4 py-3 bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer"
                 onClick={() => onToggle(status)}
             >
@@ -1531,7 +1714,7 @@ const TaskStatusGroup = ({
                     {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
                 </Badge>
             </div>
-            
+
             {/* Tasks Grid - Collapsible */}
             {isExpanded && (
                 <div className="p-4 pt-3 space-y-4 w-full">
@@ -1568,13 +1751,13 @@ const TaskStatusGroup = ({
                                                     }}
                                                     className={cn(
                                                         "min-w-[100px]",
-                                                        currentPage === 1 
-                                                            ? "pointer-events-none opacity-50 cursor-not-allowed" 
+                                                        currentPage === 1
+                                                            ? "pointer-events-none opacity-50 cursor-not-allowed"
                                                             : "hover:bg-accent hover:text-accent-foreground transition-colors"
                                                     )}
                                                 />
                                             </PaginationItem>
-                                            
+
                                             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                                                 if (
                                                     page === 1 ||
@@ -1593,8 +1776,8 @@ const TaskStatusGroup = ({
                                                                 isActive={currentPage === page}
                                                                 className={cn(
                                                                     "min-w-[40px] h-10 flex items-center justify-center",
-                                                                    currentPage === page 
-                                                                        ? "bg-primary text-primary-foreground font-semibold" 
+                                                                    currentPage === page
+                                                                        ? "bg-primary text-primary-foreground font-semibold"
                                                                         : "hover:bg-accent hover:text-accent-foreground transition-colors"
                                                                 )}
                                                             >
@@ -1611,7 +1794,7 @@ const TaskStatusGroup = ({
                                                 }
                                                 return null;
                                             })}
-                                            
+
                                             <PaginationItem>
                                                 <PaginationNext
                                                     href="#"
@@ -1624,15 +1807,15 @@ const TaskStatusGroup = ({
                                                     }}
                                                     className={cn(
                                                         "min-w-[100px]",
-                                                        currentPage === totalPages 
-                                                            ? "pointer-events-none opacity-50 cursor-not-allowed" 
+                                                        currentPage === totalPages
+                                                            ? "pointer-events-none opacity-50 cursor-not-allowed"
                                                             : "hover:bg-accent hover:text-accent-foreground transition-colors"
                                                     )}
                                                 />
                                             </PaginationItem>
                                         </PaginationContent>
                                     </Pagination>
-                                    
+
                                     {/* Results info */}
                                     <div className="text-xs text-muted-foreground">
                                         Trang {currentPage} / {totalPages} • Hiển thị {startIndex + 1}-{Math.min(endIndex, tasks.length)} trong tổng số {tasks.length} task
@@ -1707,8 +1890,8 @@ const ArchivedTaskColumn = ({ title, tasks, onTaskClick, onUnarchive, isArchivin
                 }
             </div>
 
-                {/* Pagination for archived tasks */}
-                {tasks.length > 0 && (
+            {/* Pagination for archived tasks */}
+            {tasks.length > 0 && (
                 <div className="mt-4 flex flex-col items-center gap-3 pt-3 border-t">
                     <Pagination>
                         <PaginationContent className="gap-2">
@@ -1723,13 +1906,13 @@ const ArchivedTaskColumn = ({ title, tasks, onTaskClick, onUnarchive, isArchivin
                                     }}
                                     className={cn(
                                         "min-w-[100px]",
-                                        currentPage === 1 
-                                            ? "pointer-events-none opacity-50 cursor-not-allowed" 
+                                        currentPage === 1
+                                            ? "pointer-events-none opacity-50 cursor-not-allowed"
                                             : "hover:bg-accent hover:text-accent-foreground transition-colors"
                                     )}
                                 />
                             </PaginationItem>
-                            
+
                             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                                 if (
                                     page === 1 ||
@@ -1747,8 +1930,8 @@ const ArchivedTaskColumn = ({ title, tasks, onTaskClick, onUnarchive, isArchivin
                                                 isActive={currentPage === page}
                                                 className={cn(
                                                     "min-w-[40px] h-10 flex items-center justify-center",
-                                                    currentPage === page 
-                                                        ? "bg-primary text-primary-foreground font-semibold" 
+                                                    currentPage === page
+                                                        ? "bg-primary text-primary-foreground font-semibold"
                                                         : "hover:bg-accent hover:text-accent-foreground transition-colors"
                                                 )}
                                             >
@@ -1765,7 +1948,7 @@ const ArchivedTaskColumn = ({ title, tasks, onTaskClick, onUnarchive, isArchivin
                                 }
                                 return null;
                             })}
-                            
+
                             <PaginationItem>
                                 <PaginationNext
                                     href="#"
@@ -1777,15 +1960,15 @@ const ArchivedTaskColumn = ({ title, tasks, onTaskClick, onUnarchive, isArchivin
                                     }}
                                     className={cn(
                                         "min-w-[100px]",
-                                        currentPage === totalPages 
-                                            ? "pointer-events-none opacity-50 cursor-not-allowed" 
+                                        currentPage === totalPages
+                                            ? "pointer-events-none opacity-50 cursor-not-allowed"
                                             : "hover:bg-accent hover:text-accent-foreground transition-colors"
                                     )}
                                 />
                             </PaginationItem>
                         </PaginationContent>
                     </Pagination>
-                    
+
                     {/* Results info */}
                     <div className="text-xs text-muted-foreground">
                         Trang {currentPage} / {totalPages} • Hiển thị {startIndex + 1}-{Math.min(endIndex, tasks.length)} trong tổng số {tasks.length} task
@@ -1795,3 +1978,4 @@ const ArchivedTaskColumn = ({ title, tasks, onTaskClick, onUnarchive, isArchivin
         </div>
     )
 }
+

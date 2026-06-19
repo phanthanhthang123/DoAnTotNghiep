@@ -10,7 +10,10 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
-      // define association here
+      Progress.belongsTo(models.Project, {
+        foreignKey: 'project_id',
+        as: 'project'
+      });
     }
   }
   Progress.init({
@@ -39,7 +42,9 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     sequelize,
     modelName: 'Progress',
+    tableName: 'Progress',
     timestamps: true,
+    createdAt: false,
     underscored: false
   });
   

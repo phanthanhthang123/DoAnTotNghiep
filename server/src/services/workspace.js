@@ -41,15 +41,29 @@ export const createWorkspaceService = (name, description, color, owner_id) => ne
 
 export const listWorkspaceByUserService = (user_id) => new Promise(async (resolve, reject) => {
     try {
-        // Lấy tất cả workspace mà user là member (bao gồm cả owner và member)
+        // 1. Tìm tất cả các workspace_id mà user tham gia
+        const userMemberships = await db.Workspace_Members.findAll({
+            where: { user_id: user_id },
+            attributes: ['workspace_id']
+        });
+        const workspaceIds = userMemberships.map(m => m.workspace_id);
+
+        if (workspaceIds.length === 0) {
+            return resolve({
+                err: 0,
+                msg: 'OK',
+                response: []
+            });
+        }
+
+        // 2. Lấy thông tin các workspace đó cùng với toàn bộ thành viên của từng workspace
         const response = await db.Workspaces.findAll({
+            where: {
+                id: workspaceIds
+            },
             include: [
                 {
                     model: db.Workspace_Members,
-                    where: {
-                        user_id: user_id
-                    },
-                    required: true,
                     as: 'members'
                 },
                 {
@@ -107,16 +121,46 @@ export const getWorkspaceByIdService = (id) => new Promise(async (resolve, rejec
                             as: 'members',
                             attributes: ['user_id', 'role'],
                         },
+                        {
+                            model: db.Progress,
+                            as: 'progress'
+                        },
+                        {
+                            model: db.Project_Prediction,
+                            as: 'prediction'
+                        }
                     ]
                 }
             ]
         });
         
-        resolve({
-            err: response ? 0 : 1,
-            msg: response ? 'OK' : 'WORKSPACE NOT FOUND',
-            response
-        });
+        if (response) {
+            const workspaceData = response.toJSON ? response.toJSON() : response;
+            if (Array.isArray(workspaceData.projects)) {
+                workspaceData.projects = workspaceData.projects.map(p => {
+                    let progressVal = 0;
+                    if (Array.isArray(p.progress) && p.progress.length > 0) {
+                        progressVal = p.progress[0].progress;
+                    } else if (p.progress && typeof p.progress === 'object') {
+                        progressVal = p.progress.progress || 0;
+                    }
+                    return {
+                        ...p,
+                        progress: progressVal
+                    };
+                });
+            }
+            resolve({
+                err: 0,
+                msg: 'OK',
+                response: workspaceData
+            });
+        } else {
+            resolve({
+                err: 1,
+                msg: 'WORKSPACE NOT FOUND'
+            });
+        }
     }
     catch (error) {
         reject(error);

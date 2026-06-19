@@ -145,7 +145,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   // Clear localStorage
                   localStorage.removeItem("token");
                   localStorage.removeItem("user");
-                  localStorage.removeItem("selectedWorkspaceId");
                   disconnectChatSocket();
 
                   // Clear query cache

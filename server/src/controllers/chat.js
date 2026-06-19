@@ -90,3 +90,97 @@ export const markAsRead = async (req, res) => {
   }
 };
 
+const emitSystemMessage = (req, conversationId, systemMessage) => {
+  if (!systemMessage) return;
+  const io = req.app.get('io');
+  if (!io) return;
+  const plainMessage = typeof systemMessage.toJSON === 'function' ? systemMessage.toJSON() : systemMessage;
+  io.to(`conversation:${conversationId}`).emit('message:new', {
+    conversationId,
+    message: plainMessage,
+  });
+};
+
+export const addGroupMembers = async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req);
+    if (!userId) return res.status(401).json({ err: 1, msg: 'UNAUTHORIZED' });
+    const { conversationId } = req.params;
+    const { memberIds } = req.body;
+    const response = await services.addGroupMembersService(conversationId, userId, memberIds);
+    if (!response.err && response.response?.systemMessage) {
+      emitSystemMessage(req, conversationId, response.response.systemMessage);
+    }
+    return res.status(response.err ? 400 : 200).json(response);
+  } catch (error) {
+    return res.status(500).json({ err: -1, msg: 'FAILED AT ADD GROUP MEMBERS: ' + error.message });
+  }
+};
+
+export const removeGroupMember = async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req);
+    if (!userId) return res.status(401).json({ err: 1, msg: 'UNAUTHORIZED' });
+    const { conversationId } = req.params;
+    const { targetUserId } = req.body;
+    const response = await services.removeGroupMemberService(conversationId, userId, targetUserId);
+    if (!response.err && response.response?.systemMessage) {
+      emitSystemMessage(req, conversationId, response.response.systemMessage);
+    }
+    return res.status(response.err ? 400 : 200).json(response);
+  } catch (error) {
+    return res.status(500).json({ err: -1, msg: 'FAILED AT REMOVE GROUP MEMBER: ' + error.message });
+  }
+};
+
+export const leaveGroup = async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req);
+    if (!userId) return res.status(401).json({ err: 1, msg: 'UNAUTHORIZED' });
+    const { conversationId } = req.params;
+    const response = await services.leaveGroupService(conversationId, userId);
+    if (!response.err && response.response?.systemMessage) {
+      emitSystemMessage(req, conversationId, response.response.systemMessage);
+    }
+    return res.status(response.err ? 400 : 200).json(response);
+  } catch (error) {
+    return res.status(500).json({ err: -1, msg: 'FAILED AT LEAVE GROUP: ' + error.message });
+  }
+};
+
+export const updateGroupTitle = async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req);
+    if (!userId) return res.status(401).json({ err: 1, msg: 'UNAUTHORIZED' });
+    const { conversationId } = req.params;
+    const { title } = req.body;
+    const response = await services.updateGroupTitleService(conversationId, userId, title);
+    if (!response.err && response.response?.systemMessage) {
+      emitSystemMessage(req, conversationId, response.response.systemMessage);
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('conversation:renamed', { conversationId, title });
+      }
+    }
+    return res.status(response.err ? 400 : 200).json(response);
+  } catch (error) {
+    return res.status(500).json({ err: -1, msg: 'FAILED AT UPDATE GROUP TITLE: ' + error.message });
+  }
+};
+
+export const dismissGroup = async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req);
+    if (!userId) return res.status(401).json({ err: 1, msg: 'UNAUTHORIZED' });
+    const { conversationId } = req.params;
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`conversation:${conversationId}`).emit('conversation:dismissed', { conversationId });
+    }
+    const response = await services.dismissGroupService(conversationId, userId);
+    return res.status(response.err ? 400 : 200).json(response);
+  } catch (error) {
+    return res.status(500).json({ err: -1, msg: 'FAILED AT DISMISS GROUP: ' + error.message });
+  }
+};
+

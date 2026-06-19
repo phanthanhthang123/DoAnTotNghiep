@@ -16,7 +16,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Lock, Unlock } from "lucide-react";
 import type { User } from "@/type";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -38,6 +38,7 @@ type UsersResponse = {
     | "email"
     | "role"
     | "avatarUrl"
+    | "isActive"
     | "kpiScore"
     | "kpiModelAtSignup"
     | "cpa"
@@ -264,6 +265,31 @@ const AccountsPage: React.FC = () => {
         ax?.response?.data?.message ||
         ax?.message ||
         "Không thể xóa tài khoản";
+      toast.error(msg);
+    },
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: (payload: { id: string; isActive: boolean }) =>
+      updateData<any>(`/auth/admin/users/${payload.id}/toggle-status`, { isActive: payload.isActive }),
+    onSuccess: (res: any) => {
+      if (res.err === 0) {
+        queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+        toast.success(res.msg || "Cập nhật trạng thái tài khoản thành công");
+      } else {
+        toast.error(res.msg || "Không thể cập nhật trạng thái tài khoản");
+      }
+    },
+    onError: (error: unknown) => {
+      const ax = error as {
+        response?: { data?: { msg?: string; message?: string } };
+        message?: string;
+      };
+      const msg =
+        ax?.response?.data?.msg ||
+        ax?.response?.data?.message ||
+        ax?.message ||
+        "Lỗi khi cập nhật trạng thái";
       toast.error(msg);
     },
   });
@@ -869,6 +895,9 @@ const AccountsPage: React.FC = () => {
                     Vai trò
                   </th>
                   <th className="px-4 py-2 text-left font-medium text-slate-700">
+                    Trạng thái
+                  </th>
+                  <th className="px-4 py-2 text-left font-medium text-slate-700">
                     KPI
                   </th>
                   <th className="px-4 py-2 text-right font-medium text-slate-700">
@@ -879,14 +908,14 @@ const AccountsPage: React.FC = () => {
               <tbody>
                 {isLoading && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
+                    <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
                       Đang tải danh sách tài khoản...
                     </td>
                   </tr>
                 )}
                 {!isLoading && (!data || data.length === 0) && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
+                    <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
                       Chưa có tài khoản nào.
                     </td>
                   </tr>
@@ -909,6 +938,17 @@ const AccountsPage: React.FC = () => {
                       <td className="px-4 py-2 text-slate-800">{u.username}</td>
                       <td className="px-4 py-2 text-slate-800">{u.email}</td>
                       <td className="px-4 py-2 text-slate-800">{u.role}</td>
+                      <td className="px-4 py-2 text-slate-800">
+                        {u.isActive !== false ? (
+                          <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                            Hoạt động
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
+                            Bị khóa
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-2 text-slate-700 text-xs">
                         {u.kpiScore != null && u.kpiScore !== undefined ? (
                           <span className="font-mono">
@@ -947,6 +987,30 @@ const AccountsPage: React.FC = () => {
                           >
                             <Pencil className="w-3 h-3" />
                           </Button>
+                          {user?.id !== u.id && (
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 border-slate-200"
+                              title={u.isActive !== false ? "Khóa tài khoản" : "Mở khóa tài khoản"}
+                              onClick={() => {
+                                const nextState = u.isActive === false;
+                                if (
+                                  window.confirm(
+                                    `Bạn có chắc chắn muốn ${nextState ? "mở khóa" : "khóa"} tài khoản ${u.email}?`
+                                  )
+                                ) {
+                                  toggleStatusMutation.mutate({ id: u.id, isActive: nextState });
+                                }
+                              }}
+                            >
+                              {u.isActive !== false ? (
+                                <Lock className="w-3 h-3 text-red-500" />
+                              ) : (
+                                <Unlock className="w-3 h-3 text-emerald-500" />
+                              )}
+                            </Button>
+                          )}
                           {user?.id !== u.id && (
                             <Button
                               variant="outline"

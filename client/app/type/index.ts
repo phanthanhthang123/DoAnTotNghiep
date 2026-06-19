@@ -19,6 +19,7 @@ export interface User {
   cvScore?: number | null;
   yearsExperience?: number;
   numProjectsPrior?: number;
+  isActive?: boolean;
 }
 
 export interface AppNotification {
@@ -212,6 +213,7 @@ export interface Conversation {
   type: 'direct' | 'group';
   title?: string | null;
   workspace_id?: string | null;
+  created_by?: string | null;
   members: ConversationMember[];
   lastMessage?: Message | null;
   unreadCount?: number;

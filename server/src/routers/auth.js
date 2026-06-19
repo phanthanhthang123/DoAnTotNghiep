@@ -41,6 +41,7 @@ router.get('/admin/users/:id/internal-stats', controllers.adminGetUserInternalSt
 router.post('/admin/users/send-credentials', controllers.adminSendUserCredentialsEmail);
 router.put('/admin/users/:id', controllers.adminUpdateUser);
 router.delete('/admin/users/:id', controllers.adminDeleteUser);
+router.put('/admin/users/:id/toggle-status', controllers.adminToggleUserStatus);
 router.post('/first-change-password', controllers.firstChangePassword);
 router.get('/profile', controllers.getProfile);
 router.put('/profile', controllers.updateProfile);

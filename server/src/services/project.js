@@ -190,6 +190,14 @@ export const getProjectTasksService = async (projectId, userId) => {
                             attributes: ['id', 'username', 'email', 'avatarUrl', 'role']
                         }
                     ]
+                },
+                {
+                    model: db.Progress,
+                    as: 'progress'
+                },
+                {
+                    model: db.Project_Prediction,
+                    as: 'prediction'
                 }
             ]
         });
@@ -227,10 +235,23 @@ export const getProjectTasksService = async (projectId, userId) => {
             order: [['createdAt', 'DESC']]
         });
 
+        const projectData = project.toJSON ? project.toJSON() : project;
+        let progressVal = 0;
+        if (Array.isArray(projectData.progress) && projectData.progress.length > 0) {
+            progressVal = projectData.progress[0].progress;
+        } else if (projectData.progress && typeof projectData.progress === 'object') {
+            progressVal = projectData.progress.progress || 0;
+        }
+
+        const formattedProject = {
+            ...projectData,
+            progress: progressVal
+        };
+
         return {
             err: 0,
             msg: 'OK',
-            project,
+            project: formattedProject,
             tasks // luôn có mảng (dù rỗng)
         };
 

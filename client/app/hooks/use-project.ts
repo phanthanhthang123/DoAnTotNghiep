@@ -122,3 +122,77 @@ export const useRemoveMemberFromProjectMutation = () => {
         }
     });
 }
+
+// ===== AI Prediction =====
+export interface PredictionSuggestion {
+    feature: string;
+    importance: number;
+    description: string;
+    suggestion: string;
+}
+
+export interface PerClassMetric {
+    label: string;
+    precision: number;
+    recall: number;
+    f1_score: number;
+    support: number;
+}
+
+export interface PredictionConfidence {
+    probabilities: Record<string, number>;
+    predicted_class: string;
+    confidence_percent: number;
+}
+
+export interface ModelEvaluation {
+    accuracy: number;
+    confusion_matrix: number[][];
+    class_labels: string[];
+    per_class_metrics: PerClassMetric[];
+    cv_accuracy_mean: number;
+    cv_accuracy_std: number;
+    cv_scores: number[];
+    precision_macro: number;
+    recall_macro: number;
+    f1_macro: number;
+    precision_weighted: number;
+    recall_weighted: number;
+    f1_weighted: number;
+    test_size: number;
+    train_size: number;
+    total_samples: number;
+    prediction_confidence: PredictionConfidence;
+}
+
+export interface PredictionResult {
+    err: number;
+    msg: string;
+    prediction: {
+        risk_level: 'Low' | 'Medium' | 'High';
+        input_summary: {
+            team_size: number;
+            planned_duration_days: number;
+            total_tasks: number;
+            remaining_hard_tasks: number;
+            remaining_high_priority_tasks: number;
+            elapsed_time_ratio: number;
+            task_completion_ratio: number;
+            overdue_tasks_count: number;
+        };
+        suggestions: PredictionSuggestion[];
+        model_evaluation: ModelEvaluation | null;
+    };
+}
+
+export const useProjectDelayPrediction = () => {
+    return useMutation({
+        mutationFn: async (projectId: string) => {
+            return await fetchData<PredictionResult>(`/project/${projectId}/predict-delay`);
+        },
+        onError: (error: any) => {
+            const errorMessage = error?.response?.data?.msg || "Không thể phân tích rủi ro dự án";
+            toast.error(errorMessage);
+        }
+    });
+}
