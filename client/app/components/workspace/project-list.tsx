@@ -129,7 +129,66 @@ const ProjectList = (props: {
         />
       ) : (
         <>
-          <div className="overflow-x-auto rounded-lg border bg-card">
+          {/* Mobile View: Project Cards */}
+          <div className="block md:hidden space-y-4">
+            {paginatedProjects.map((project) => {
+              const tasks = project.tasks || [];
+              const projectProgress =
+                tasks.length > 0 ? getProjectProgress(tasks) : project.progress || 0;
+              const href = `/workspaces/${props.workspaceId}/projects/${project.id}`;
+              const start = project?.start_date
+                ? format(new Date(project.start_date), "dd/MM/yyyy")
+                : "—";
+              const end = project?.end_date
+                ? format(new Date(project.end_date), "dd/MM/yyyy")
+                : "—";
+
+              return (
+                <div
+                  key={project.id}
+                  className="bg-white rounded-lg border p-4 shadow-sm hover:border-blue-500 transition-colors cursor-pointer space-y-3"
+                  onClick={() => navigate(href)}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <h4 className="font-semibold text-slate-900 line-clamp-1">{project.name}</h4>
+                      {project.description && (
+                        <p className="text-xs text-slate-500 line-clamp-2">{project.description}</p>
+                      )}
+                    </div>
+                    <span
+                      className={cn(
+                        "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap shrink-0",
+                        getTaskStatusColor(project.status)
+                      )}
+                    >
+                      {getProjectStatusLabel(project.status)}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 pt-2 border-t">
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>Tiến độ</span>
+                      <span className="font-semibold text-slate-700">{projectProgress}%</span>
+                    </div>
+                    <Progress value={projectProgress} className="h-1.5 text-blue-600" />
+                  </div>
+
+                  <div className="flex justify-between items-center text-xs pt-2 border-t text-slate-500">
+                    <div>
+                      Task: <span className="font-semibold text-slate-700">{project?.tasks?.length ?? 0}</span>
+                    </div>
+                    <div className="font-mono text-[11px]">
+                      {start} → {end}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop View: Project Table */}
+          <div className="hidden md:block overflow-x-auto rounded-lg border bg-card">
             <table className="w-full min-w-[640px] caption-bottom text-xs">
               <thead>
                 <tr className="border-b bg-muted/40 text-muted-foreground">

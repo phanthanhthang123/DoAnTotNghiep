@@ -4,6 +4,7 @@ import { fetchData } from "@/lib/fetch-utlis"
 import { Loader } from "../../components/loader";
 import type { Task } from "@/type";
 import { useSearchParams, useNavigate } from "react-router";
+import { NoDataFound } from "@/components/workspace/no-data-found";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -127,9 +128,34 @@ const MyTasks = () => {
       });
   }, [data?.response, taskSearchQuery, statusFilter, priorityFilter, dueFilter]);
 
+
+
   React.useEffect(() => {
     setPage(1);
   }, [workspaceId, taskSearchQuery, statusFilter, priorityFilter, dueFilter]);
+
+  if (!workspaceId) {
+    return (
+      <div className="h-full p-4 flex flex-col overflow-hidden">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 shrink-0">
+          <div>
+            <h1 className="text-2xl font-bold">Task Của Tôi</h1>
+            <p className="text-sm text-muted-foreground">Vui lòng chọn không gian làm việc để xem task.</p>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg">
+            <NoDataFound
+              title="Chưa chọn không gian làm việc"
+              description="Vui lòng chọn một workspace ở thanh trên hoặc truy cập danh sách để bắt đầu xem nhiệm vụ của bạn."
+              buttonText="Đi tới không gian làm việc"
+              buttonAction={() => navigate("/workspaces")}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isPending) {
     return (
@@ -137,7 +163,7 @@ const MyTasks = () => {
         <h1 className="text-2xl font-bold mb-6">Task Của Tôi</h1>
         <Loader />
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -150,11 +176,6 @@ const MyTasks = () => {
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
           <p className="text-sm text-destructive font-medium">Lỗi khi tải tasks</p>
           <p className="text-xs text-muted-foreground mt-1">{errorMessage}</p>
-          {!workspaceId && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Vui lòng chọn workspace để xem tasks của bạn.
-            </p>
-          )}
           {Object.keys(errorDetails).length > 0 && (
             <details className="mt-2">
               <summary className="text-xs text-muted-foreground cursor-pointer">Chi tiết lỗi</summary>
@@ -165,7 +186,7 @@ const MyTasks = () => {
           )}
         </div>
       </div>
-    )
+    );
   }
 
   const tasks = data?.response || [];
@@ -177,19 +198,38 @@ const MyTasks = () => {
   const endIndex = startIndex + TASKS_PER_PAGE;
   const paginatedTasks = filteredTasks.slice(startIndex, endIndex);
 
+  if (tasks.length === 0) {
+    return (
+      <div className="h-full p-4 flex flex-col overflow-hidden">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 shrink-0">
+          <div>
+            <h1 className="text-2xl font-bold">Task Của Tôi</h1>
+            <p className="text-sm text-muted-foreground">
+              Workspace: <span className="font-medium text-foreground">{workspaceName}</span>
+            </p>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg">
+            <NoDataFound
+              title="Bạn chưa có task nào trong không gian này"
+              description="Hiện tại không gian làm việc này chưa có nhiệm vụ nào được giao cho bạn."
+              buttonText="Đi tới danh sách dự án"
+              buttonAction={() => navigate(`/workspaces/${workspaceId}`)}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full p-4 flex flex-col overflow-hidden">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 shrink-0">
         <div>
           <h1 className="text-2xl font-bold">Task Của Tôi</h1>
           <p className="text-sm text-muted-foreground">
-            {workspaceId ? (
-              <span>
-                Workspace: <span className="font-medium text-foreground">{workspaceName}</span>
-              </span>
-            ) : (
-              "Vui lòng chọn workspace để xem tasks."
-            )}
+            Workspace: <span className="font-medium text-foreground">{workspaceName}</span>
           </p>
         </div>
         <Badge variant="outline" className="w-fit">
@@ -197,268 +237,346 @@ const MyTasks = () => {
         </Badge>
       </div>
 
-      {tasks.length === 0 ? (
-        <div className="text-center py-8 flex-1 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground">Bạn chưa có task nào</p>
-        </div>
-      ) : (
-        <div className="space-y-4 flex-1 min-h-0 overflow-hidden flex flex-col">
-          {/* Search Bar */}
-          <div className='p-4 bg-muted/30 rounded-lg border space-y-3'>
-            <div className='relative'>
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-4 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm task..."
-                value={taskSearchQuery}
-                onChange={(e) => setTaskSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            {/* Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Trạng thái" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">Tất cả trạng thái</SelectItem>
-                  <SelectItem value="To Do">Chưa làm</SelectItem>
-                  <SelectItem value="In Progress">Đang làm</SelectItem>
-                  <SelectItem value="Done">Hoàn thành</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as any)}>
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Ưu tiên" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">Tất cả ưu tiên</SelectItem>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="Low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={dueFilter} onValueChange={(v) => setDueFilter(v as any)}>
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Hạn chót" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">Tất cả hạn chót</SelectItem>
-                  <SelectItem value="Overdue">Quá hạn</SelectItem>
-                  <SelectItem value="Today">Hôm nay</SelectItem>
-                  <SelectItem value="Next 7 days">7 ngày tới</SelectItem>
-                  <SelectItem value="Next 30 days">30 ngày tới</SelectItem>
-                  <SelectItem value="No due date">Không có hạn</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Button
-                variant="outline"
-                className="bg-white"
-                onClick={() => {
-                  setStatusFilter("All");
-                  setPriorityFilter("All");
-                  setDueFilter("All");
-                }}
-                disabled={statusFilter === "All" && priorityFilter === "All" && dueFilter === "All"}
-              >
-                Xóa lọc
-              </Button>
-            </div>
+      <div className="space-y-4 flex-1 min-h-0 overflow-hidden flex flex-col">
+        {/* Search Bar */}
+        <div className='p-4 bg-muted/30 rounded-lg border space-y-3'>
+          <div className='relative'>
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input
+              placeholder="Tìm kiếm task..."
+              value={taskSearchQuery}
+              onChange={(e) => setTaskSearchQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
 
-          {!workspaceId ? (
-            <div className="text-center py-8 flex-1 flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">
-                Vui lòng chọn workspace để xem tasks.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3 flex-1 min-h-0 flex flex-col overflow-hidden">
-              <div className="flex-1 min-h-0 overflow-auto rounded-lg border bg-white">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-muted/60">
-                    <tr>
-                      <th className="px-4 py-2 text-left font-medium text-slate-700 w-[28%]">
-                        Workspace &gt; Project
-                      </th>
-                      <th className="px-4 py-2 text-left font-medium text-slate-700 w-[36%]">Task</th>
-                      <th className="px-4 py-2 text-left font-medium text-slate-700">Trạng thái</th>
-                      <th className="px-4 py-2 text-left font-medium text-slate-700">Ưu tiên</th>
-                      <th className="px-4 py-2 text-left font-medium text-slate-700">Độ khó</th>
-                      <th className="px-4 py-2 text-left font-medium text-slate-700">Hạn chót</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedTasks.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                          {taskSearchQuery ? "Không tìm thấy task nào phù hợp." : "Bạn chưa có task nào."}
+          {/* Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="Trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">Tất cả trạng thái</SelectItem>
+                <SelectItem value="To Do">Chưa làm</SelectItem>
+                <SelectItem value="In Progress">Đang làm</SelectItem>
+                <SelectItem value="Done">Hoàn thành</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as any)}>
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="Ưu tiên" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">Tất cả ưu tiên</SelectItem>
+                <SelectItem value="High">High</SelectItem>
+                <SelectItem value="Medium">Medium</SelectItem>
+                <SelectItem value="Low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={dueFilter} onValueChange={(v) => setDueFilter(v as any)}>
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="Hạn chót" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">Tất cả hạn chót</SelectItem>
+                <SelectItem value="Overdue">Quá hạn</SelectItem>
+                <SelectItem value="Today">Hôm nay</SelectItem>
+                <SelectItem value="Next 7 days">7 ngày tới</SelectItem>
+                <SelectItem value="Next 30 days">30 ngày tới</SelectItem>
+                <SelectItem value="No due date">Không có hạn</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              variant="outline"
+              className="bg-white"
+              onClick={() => {
+                setStatusFilter("All");
+                setPriorityFilter("All");
+                setDueFilter("All");
+              }}
+              disabled={statusFilter === "All" && priorityFilter === "All" && dueFilter === "All"}
+            >
+              Xóa lọc
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-3 flex-1 min-h-0 flex flex-col overflow-hidden">
+          {/* Mobile View: Cards */}
+          <div className="block md:hidden flex-1 min-h-0 overflow-auto space-y-3 p-1">
+            {paginatedTasks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed rounded-lg border-border/60 bg-white">
+                <Search className="size-8 text-muted-foreground mb-3 opacity-60" />
+                <h3 className="font-semibold text-base">Không tìm thấy kết quả</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mt-1 px-4">
+                  Không tìm thấy nhiệm vụ phù hợp với bộ lọc hoặc từ khóa "{taskSearchQuery}".
+                </p>
+              </div>
+            ) : (
+              paginatedTasks.map((task: Task) => {
+                const project = typeof task.project === "object" ? (task.project as any) : null;
+                const projectName = project?.name || "Không xác định";
+                const projectIdForNav = project?.id || "unknown";
+                return (
+                  <div
+                    key={task.id}
+                    className="bg-white rounded-lg border p-4 shadow-sm hover:border-blue-500 transition-colors cursor-pointer space-y-3"
+                    onClick={() => {
+                      if (workspaceId && projectIdForNav !== "unknown") {
+                        navigate(`/workspaces/${workspaceId}/projects/${projectIdForNav}/tasks/${task.id}`);
+                      }
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <h3 className="font-semibold text-slate-900 line-clamp-1">{task.title}</h3>
+                        <div className="text-xs text-slate-500">
+                          <span>{workspaceName}</span>
+                          <span className="mx-1">&gt;</span>
+                          <span className="font-medium text-slate-700">{projectName}</span>
+                        </div>
+                      </div>
+                      <Badge
+                        className={cn(
+                          "shrink-0",
+                          task.status === "To Do"
+                            ? "bg-slate-100 text-slate-700 border border-slate-200"
+                            : task.status === "In Progress"
+                              ? "bg-blue-100 text-blue-700 border border-blue-200"
+                              : "bg-green-100 text-green-700 border border-green-200"
+                        )}
+                      >
+                        {task.status === "To Do" ? "Chưa Làm" : task.status === "In Progress" ? "Đang Làm" : "Hoàn Thành"}
+                      </Badge>
+                    </div>
+
+                    {task.description && (
+                      <p className="text-xs text-slate-600 line-clamp-2 bg-slate-50 p-2 rounded">
+                        {task.description}
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 pt-2 border-t items-center justify-between text-xs">
+                      <div className="flex gap-1.5">
+                        <Badge
+                          className={
+                            task.priority === "High"
+                              ? "bg-red-100 text-red-700 border border-red-200"
+                              : task.priority === "Medium"
+                                ? "bg-yellow-100 text-yellow-700 border border-yellow-200"
+                                : "bg-slate-100 text-slate-700 border border-slate-200"
+                          }
+                        >
+                          {task.priority}
+                        </Badge>
+                        <Badge className="bg-slate-100 text-slate-700 border border-slate-200">
+                          {(task as any).difficulty === "Easy"
+                            ? "Dễ"
+                            : (task as any).difficulty === "Hard"
+                              ? "Khó"
+                              : "Trung bình"}
+                        </Badge>
+                      </div>
+                      <div className="text-slate-500 font-mono">
+                        Hạn: {task.dueDate ? format(new Date(task.dueDate), "dd/MM/yyyy") : "—"}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop View: Table */}
+          <div className="hidden md:block flex-1 min-h-0 overflow-auto rounded-lg border bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/60">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium text-slate-700 w-[28%]">
+                    Workspace &gt; Project
+                  </th>
+                  <th className="px-4 py-2 text-left font-medium text-slate-700 w-[36%]">Task</th>
+                  <th className="px-4 py-2 text-left font-medium text-slate-700">Trạng thái</th>
+                  <th className="px-4 py-2 text-left font-medium text-slate-700">Ưu tiên</th>
+                  <th className="px-4 py-2 text-left font-medium text-slate-700">Độ khó</th>
+                  <th className="px-4 py-2 text-left font-medium text-slate-700">Hạn chót</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedTasks.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                      <div className="flex flex-col items-center justify-center py-6 text-center">
+                        <Search className="size-8 text-muted-foreground mb-3 opacity-60" />
+                        <h3 className="font-semibold text-base">Không tìm thấy kết quả</h3>
+                        <p className="text-sm text-muted-foreground max-w-xs mt-1 px-4">
+                          Không tìm thấy nhiệm vụ phù hợp với bộ lọc hoặc từ khóa "{taskSearchQuery}".
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedTasks.map((task: Task) => {
+                    const project = typeof task.project === "object" ? (task.project as any) : null;
+                    const projectName = project?.name || "Không xác định";
+                    const projectIdForNav = project?.id || "unknown";
+                    return (
+                      <tr
+                        key={task.id}
+                        className="border-t hover:bg-muted/60 cursor-pointer"
+                        onClick={() => {
+                          if (workspaceId && projectIdForNav !== "unknown") {
+                            navigate(`/workspaces/${workspaceId}/projects/${projectIdForNav}/tasks/${task.id}`);
+                          }
+                        }}
+                      >
+                        <td className="px-4 py-2 align-top">
+                          <div className="text-xs text-slate-700">
+                            <span className="font-medium">{workspaceName}</span>
+                            <span className="text-slate-400"> &gt; </span>
+                            <span className="truncate">{projectName}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 align-top">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-medium text-slate-900">{task.title}</span>
+                            {task.description && (
+                              <span className="text-xs text-slate-500 line-clamp-2">{task.description}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 align-top">
+                          <Badge
+                            className={
+                              task.status === "To Do"
+                                ? "bg-slate-100 text-slate-700 border border-slate-200"
+                                : task.status === "In Progress"
+                                  ? "bg-blue-100 text-blue-700 border border-blue-200"
+                                  : "bg-green-100 text-green-700 border border-green-200"
+                            }
+                          >
+                            {task.status === "To Do" ? "Chưa Làm" : task.status === "In Progress" ? "Đang Làm" : "Hoàn Thành"}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-2 align-top">
+                          <Badge
+                            className={
+                              task.priority === "High"
+                                ? "bg-red-100 text-red-700 border border-red-200"
+                                : task.priority === "Medium"
+                                  ? "bg-yellow-100 text-yellow-700 border border-yellow-200"
+                                  : "bg-slate-100 text-slate-700 border border-slate-200"
+                            }
+                          >
+                            {task.priority}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-2 align-top">
+                          <Badge className="bg-slate-100 text-slate-700 border border-slate-200">
+                            {(task as any).difficulty === "Easy"
+                              ? "Dễ"
+                              : (task as any).difficulty === "Hard"
+                                ? "Khó"
+                                : "Trung bình"}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-2 align-top text-xs text-slate-700">
+                          {task.dueDate ? format(new Date(task.dueDate), "dd/MM/yyyy") : "—"}
                         </td>
                       </tr>
-                    ) : (
-                      paginatedTasks.map((task: Task) => {
-                        const project = typeof task.project === "object" ? (task.project as any) : null;
-                        const projectName = project?.name || "Không xác định";
-                        const projectIdForNav = project?.id || "unknown";
-                        return (
-                          <tr
-                            key={task.id}
-                            className="border-t hover:bg-muted/60 cursor-pointer"
-                            onClick={() => {
-                              if (workspaceId && projectIdForNav !== "unknown") {
-                                navigate(`/workspaces/${workspaceId}/projects/${projectIdForNav}/tasks/${task.id}`);
-                              }
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Global Pagination */}
+          {filteredTasks.length > 0 && (
+            <div className="flex flex-col items-center gap-3 pt-2 shrink-0">
+              <Pagination>
+                <PaginationContent className="gap-2">
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (safePage > 1) setPage(safePage - 1);
+                      }}
+                      className={cn(
+                        "min-w-[100px]",
+                        safePage === 1
+                          ? "pointer-events-none opacity-50 cursor-not-allowed"
+                          : "hover:bg-accent hover:text-accent-foreground transition-colors"
+                      )}
+                    />
+                  </PaginationItem>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
+                    if (p === 1 || p === totalPages || (p >= safePage - 1 && p <= safePage + 1)) {
+                      return (
+                        <PaginationItem key={p}>
+                          <PaginationLink
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setPage(p);
                             }}
+                            isActive={safePage === p}
+                            className={cn(
+                              "min-w-[40px] h-10 flex items-center justify-center",
+                              safePage === p
+                                ? "bg-primary text-primary-foreground font-semibold"
+                                : "hover:bg-accent hover:text-accent-foreground transition-colors"
+                            )}
                           >
-                            <td className="px-4 py-2 align-top">
-                              <div className="text-xs text-slate-700">
-                                <span className="font-medium">{workspaceName}</span>
-                                <span className="text-slate-400"> &gt; </span>
-                                <span className="truncate">{projectName}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-2 align-top">
-                              <div className="flex flex-col gap-1">
-                                <span className="font-medium text-slate-900">{task.title}</span>
-                                {task.description && (
-                                  <span className="text-xs text-slate-500 line-clamp-2">{task.description}</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-2 align-top">
-                              <Badge
-                                className={
-                                  task.status === "To Do"
-                                    ? "bg-slate-100 text-slate-700 border border-slate-200"
-                                    : task.status === "In Progress"
-                                      ? "bg-blue-100 text-blue-700 border border-blue-200"
-                                      : "bg-green-100 text-green-700 border border-green-200"
-                                }
-                              >
-                                {task.status === "To Do" ? "Chưa Làm" : task.status === "In Progress" ? "Đang Làm" : "Hoàn Thành"}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-2 align-top">
-                              <Badge
-                                className={
-                                  task.priority === "High"
-                                    ? "bg-red-100 text-red-700 border border-red-200"
-                                    : task.priority === "Medium"
-                                      ? "bg-yellow-100 text-yellow-700 border border-yellow-200"
-                                      : "bg-slate-100 text-slate-700 border border-slate-200"
-                                }
-                              >
-                                {task.priority}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-2 align-top">
-                              <Badge className="bg-slate-100 text-slate-700 border border-slate-200">
-                                {(task as any).difficulty === "Easy"
-                                  ? "Dễ"
-                                  : (task as any).difficulty === "Hard"
-                                    ? "Khó"
-                                    : "Trung bình"}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-2 align-top text-xs text-slate-700">
-                              {task.dueDate ? format(new Date(task.dueDate), "dd/MM/yyyy") : "—"}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                            {p}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    }
+                    if (p === safePage - 2 || p === safePage + 2) {
+                      return (
+                        <PaginationItem key={p}>
+                          <span className="px-2 py-2 text-muted-foreground">...</span>
+                        </PaginationItem>
+                      );
+                    }
+                    return null;
+                  })}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (safePage < totalPages) setPage(safePage + 1);
+                      }}
+                      className={cn(
+                        "min-w-[100px]",
+                        safePage === totalPages
+                          ? "pointer-events-none opacity-50 cursor-not-allowed"
+                          : "hover:bg-accent hover:text-accent-foreground transition-colors"
+                      )}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+
+              <div className="text-xs text-muted-foreground">
+                Trang {safePage} / {totalPages} • Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredTasks.length)} trong tổng số{" "}
+                {filteredTasks.length} task
               </div>
-
-              {/* Global Pagination */}
-              {filteredTasks.length > 0 && (
-                <div className="flex flex-col items-center gap-3 pt-2 shrink-0">
-                  <Pagination>
-                    <PaginationContent className="gap-2">
-                      <PaginationItem>
-                        <PaginationPrevious
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (safePage > 1) setPage(safePage - 1);
-                          }}
-                          className={cn(
-                            "min-w-[100px]",
-                            safePage === 1
-                              ? "pointer-events-none opacity-50 cursor-not-allowed"
-                              : "hover:bg-accent hover:text-accent-foreground transition-colors"
-                          )}
-                        />
-                      </PaginationItem>
-
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
-                        if (p === 1 || p === totalPages || (p >= safePage - 1 && p <= safePage + 1)) {
-                          return (
-                            <PaginationItem key={p}>
-                              <PaginationLink
-                                href="#"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setPage(p);
-                                }}
-                                isActive={safePage === p}
-                                className={cn(
-                                  "min-w-[40px] h-10 flex items-center justify-center",
-                                  safePage === p
-                                    ? "bg-primary text-primary-foreground font-semibold"
-                                    : "hover:bg-accent hover:text-accent-foreground transition-colors"
-                                )}
-                              >
-                                {p}
-                              </PaginationLink>
-                            </PaginationItem>
-                          );
-                        }
-                        if (p === safePage - 2 || p === safePage + 2) {
-                          return (
-                            <PaginationItem key={p}>
-                              <span className="px-2 py-2 text-muted-foreground">...</span>
-                            </PaginationItem>
-                          );
-                        }
-                        return null;
-                      })}
-
-                      <PaginationItem>
-                        <PaginationNext
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (safePage < totalPages) setPage(safePage + 1);
-                          }}
-                          className={cn(
-                            "min-w-[100px]",
-                            safePage === totalPages
-                              ? "pointer-events-none opacity-50 cursor-not-allowed"
-                              : "hover:bg-accent hover:text-accent-foreground transition-colors"
-                          )}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-
-                  <div className="text-xs text-muted-foreground">
-                    Trang {safePage} / {totalPages} • Hiển thị {startIndex + 1}-{Math.min(endIndex, filteredTasks.length)} trong tổng số{" "}
-                    {filteredTasks.length} task
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
-      )}
+      </div>
     </div>
-  )
+  );
 }
 
 export default MyTasks

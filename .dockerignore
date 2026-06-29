@@ -1,0 +1,6 @@
+.git
+.cursor
+HM/.venv
+HM/logs
+HM/output
+*/node_modules

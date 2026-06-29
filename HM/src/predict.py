@@ -15,6 +15,7 @@ from typing import Any
 
 import joblib
 import numpy as np
+import pandas as pd
 
 from src.utils import KPI_MAX_INTERNAL, KPI_MAX_ONBOARDING, model_path, ROOT_DIR
 
@@ -160,20 +161,18 @@ def predict_project_delay(
     rf_model = bundle["model"]
     feature_cols = bundle["feature_columns"]
 
-    # 2. Tạo vector đầu vào
-    vec = np.array([
-        [
-            project.team_size,
-            project.planned_duration_days,
-            project.total_tasks,
-            project.remaining_hard_tasks,
-            project.remaining_high_priority_tasks,
-            project.elapsed_time_ratio,
-            project.task_completion_ratio,
-            project.overdue_tasks_count,
-            avg_member_kpi
-        ]
-    ], dtype=float)
+    # 2. Tạo DataFrame đầu vào với tên cột khớp với lúc train (tránh UserWarning)
+    vec = pd.DataFrame([[
+        project.team_size,
+        project.planned_duration_days,
+        project.total_tasks,
+        project.remaining_hard_tasks,
+        project.remaining_high_priority_tasks,
+        project.elapsed_time_ratio,
+        project.task_completion_ratio,
+        project.overdue_tasks_count,
+        avg_member_kpi
+    ]], columns=feature_cols, dtype=float)
 
     # 3. Dự đoán + xác suất từng class
     risk_idx = rf_model.predict(vec)[0]

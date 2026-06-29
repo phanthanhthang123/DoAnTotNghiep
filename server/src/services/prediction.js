@@ -4,7 +4,7 @@ import path from 'path';
 import { v4 } from 'uuid';
 
 // Đường dẫn tới thư mục HM (Python AI)
-const HM_DIR = path.resolve(__dirname, '..', '..', '..', 'HM');
+const HM_DIR = process.env.HM_ROOT || path.resolve(__dirname, '..', '..', '..', 'HM');
 
 /**
  * Mapping feature name → gợi ý hành động cho Leader.
@@ -144,9 +144,10 @@ export const collectProjectData = async (projectId) => {
  */
 export const callPythonPredict = (inputData) => {
     return new Promise((resolve, reject) => {
-        const py = spawn('python', ['-m', 'src.predict_project_cli'], {
+        const pythonExec = process.env.PYTHON_PATH || 'python';
+        const py = spawn(pythonExec, ['-m', 'src.predict_project_cli'], {
             cwd: HM_DIR,
-            env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+            env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' }
         });
 
         let stdout = '';

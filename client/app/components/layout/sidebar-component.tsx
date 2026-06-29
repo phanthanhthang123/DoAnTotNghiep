@@ -5,6 +5,7 @@ import {
   ChevronsRight,
   LogOut,
   Wrench,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router";
@@ -20,8 +21,14 @@ import React from "react";
 
 export const SidebarComponent = ({
   currentWorkspace,
+  isOpen = false,
+  onClose,
+  isMobile = false,
 }: {
   currentWorkspace: Workspace | null;
+  isOpen?: boolean;
+  onClose?: () => void;
+  isMobile?: boolean;
 }) => {
   const { user, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -66,42 +73,72 @@ export const SidebarComponent = ({
     } else {
       navigate('/dashboard');
     }
+    if (isMobile && onClose) {
+      onClose();
+    }
   };
 
   return (
     <div
       className={cn(
-        "flex flex-col border-r bg-sidebar transition-all duration-300 sticky top-0 h-screen",
-        isCollapsed ? "md:w[80px]" : "md:w[240px]"
+        isMobile
+          ? "fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col border-r bg-sidebar transition-transform duration-300 md:hidden"
+          : "hidden md:flex flex-col border-r bg-sidebar transition-all duration-300 sticky top-0 h-screen",
+        isMobile
+          ? (isOpen ? "translate-x-0" : "-translate-x-full")
+          : (isCollapsed ? "md:w-[80px]" : "md:w-[240px]")
       )}
     >
-      <div className="flex h-14 items-center justify-center border-b px-4 mb-4">
+      <div className="flex h-14 items-center justify-between border-b px-4 mb-4 shrink-0">
         <button 
           onClick={handleLogoClick}
           className="flex items-center cursor-pointer hover:opacity-80 transition-opacity"
         >
-          {!isCollapsed && (
+          {isMobile ? (
             <div className="flex items-center gap-2">
               <Wrench className="size-6 text-blue-600" />
-              <span className="font-semibold text-lg hidden md:block">
+              <span className="font-semibold text-lg">
                 Project Manager
               </span>
             </div>
-          )}
-          {isCollapsed && <Wrench className="size-6 text-blue-600" />}
-        </button>
-
-        <Button
-          variant={"ghost"}
-          size = "icon"
-          className="ml-auto hidden md:block justify-center"
-          onClick={() => setIsCollapsed(!isCollapsed)}>
-          {isCollapsed ? (
-            <ChevronsRight className="size-4" color="blue" />
           ) : (
-            <ChevronsLeft className="size-4" color="blue"/>
+            <>
+              {!isCollapsed && (
+                <div className="flex items-center gap-2">
+                  <Wrench className="size-6 text-blue-600" />
+                  <span className="font-semibold text-lg hidden md:block">
+                    Project Manager
+                  </span>
+                </div>
+              )}
+              {isCollapsed && <Wrench className="size-6 text-blue-600" />}
+            </>
           )}
-        </Button>
+        </button>
+ 
+        {isMobile ? (
+          onClose && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+            >
+              <X className="size-5" />
+            </Button>
+          )
+        ) : (
+          <Button
+            variant={"ghost"}
+            size = "icon"
+            className="ml-auto hidden md:block justify-center"
+            onClick={() => setIsCollapsed(!isCollapsed)}>
+            {isCollapsed ? (
+              <ChevronsRight className="size-4" color="blue" />
+            ) : (
+              <ChevronsLeft className="size-4" color="blue"/>
+            )}
+          </Button>
+        )}
       </div>
 
       <ScrollArea className="flex-1 px-3 py-2">
@@ -110,24 +147,29 @@ export const SidebarComponent = ({
           items={NAV_ITEMS.filter((item) =>
             item.href === "/accounts" ? user?.role === "Admin" : true
           )}
-          isCollapsed={isCollapsed}
+          isCollapsed={isMobile ? false : isCollapsed}
           currentWorkspace={currentWorkspace}
           chatUnreadCount={chatUnreadCount}
-          className={cn(isCollapsed && "items-center space-y-2")}
+          className={cn(!isMobile && isCollapsed && "items-center space-y-2")}
+          onItemClick={isMobile ? onClose : undefined}
         />
       </ScrollArea>
 
-      <div>
+      <div className="p-3 border-t">
         <Button
           variant={"ghost"}
-          size={isCollapsed ? "icon" : "default"}
+          size={(!isMobile && isCollapsed) ? "icon" : "default"}
+          className="w-full justify-start"
           onClick={() => {
             logout();
             navigate("/sign-in");
+            if (isMobile && onClose) {
+              onClose();
+            }
           }}
         >
-          <LogOut className={cn("size-4", isCollapsed ? "" : "mr-2")} />
-          <span className="hidden mb:block">{t("header.signOut")}</span>
+          <LogOut className={cn("size-4", (!isMobile && isCollapsed) ? "" : "mr-2")} />
+          {(!isMobile && isCollapsed) ? null : <span>{t("header.signOut")}</span>}
         </Button>
       </div>
     </div>

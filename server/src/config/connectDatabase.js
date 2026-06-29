@@ -11,11 +11,17 @@ import {Sequelize}  from 'sequelize';
 // });
 
 // Option 3: Passing parameters separately (other dialects)
-const sequelize = new Sequelize('project_manager', 'root', null, {
-    host: 'localhost',
-    dialect: 'mysql', /* one of 'mysql' | 'postgres' | 'sqlite' | 'mariadb' | 'mssql' | 'db2' | 'snowflake' | 'oracle' */
-    logging: false
-});
+const sequelize = new Sequelize(
+    process.env.DB_NAME || 'project_manager',
+    process.env.DB_USER || 'root',
+    process.env.DB_PASS || null,
+    {
+        host: process.env.DB_HOST || 'localhost',
+        port: process.env.DB_PORT || 3306,
+        dialect: 'mysql', /* one of 'mysql' | 'postgres' | 'sqlite' | 'mariadb' | 'mssql' | 'db2' | 'snowflake' | 'oracle' */
+        logging: false
+    }
+);
 
 const connectDatabase = async () => {
     try {

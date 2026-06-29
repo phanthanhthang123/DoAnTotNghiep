@@ -3,7 +3,7 @@ import type { Workspace } from "@/type";
 import type { AppNotification } from "@/type";
 import { Button } from "../ui/button";
 import { useLoaderData, useLocation, useNavigate } from "react-router";
-import { Bell, LogOut, PlusCircle, Settings } from "lucide-react";
+import { Bell, LogOut, PlusCircle, Settings, Menu } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,12 +28,14 @@ interface HeaderProps {
   onWorkspaceSelected?: (workspace: Workspace) => void;
   selectedWorkspace?: Workspace | null;
   onCreateWorkspace?: () => void;
+  onMenuToggle?: () => void;
 }
 
 export const Header = ({
   onWorkspaceSelected,
   selectedWorkspace,
   onCreateWorkspace,
+  onMenuToggle,
 }: HeaderProps) => {
   const { user, logout } = useAuth();
   const { t } = useTranslation();
@@ -60,9 +62,8 @@ export const Header = ({
 
   const handleOnClickWorkspace = (ws: Workspace) => {
     onWorkspaceSelected && onWorkspaceSelected(ws);
-    const location = window.location;
     if (isOnWorkspacePage) {
-      location.href = `/workspaces/${ws.id}`;
+      navigate(`/workspaces/${ws.id}`);
     } else {
       const basePath = location.pathname;
       navigate(`${basePath}?workspaceId=${ws.id}`);
@@ -102,54 +103,66 @@ export const Header = ({
   return (
     <div className="bg-background sticky top-0 z-40 border-b">
       <div className="flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8 py-4">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant={"outline"}>
-              {selectedWorkspace ? (
-                <>
-                  {selectedWorkspace.color && (
-                    <WorkspaceAvatar
-                      color={selectedWorkspace.color}
-                      name={selectedWorkspace.name}
-                    />
-                  )}
-                  <span className="font-medium">{selectedWorkspace?.name}</span>
-                </>
-              ) : (
-                <span className="font-medium">
-                  {t("header.selectWorkspace")}
-                </span>
-              )}
+        <div className="flex items-center gap-2">
+          {onMenuToggle && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={onMenuToggle}
+            >
+              <Menu className="h-5 w-5" />
             </Button>
-          </DropdownMenuTrigger>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant={"outline"}>
+                {selectedWorkspace ? (
+                  <>
+                    {selectedWorkspace.color && (
+                      <WorkspaceAvatar
+                        color={selectedWorkspace.color}
+                        name={selectedWorkspace.name}
+                      />
+                    )}
+                    <span className="font-medium">{selectedWorkspace?.name}</span>
+                  </>
+                ) : (
+                  <span className="font-medium">
+                    {t("header.selectWorkspace")}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
 
-          <DropdownMenuContent>
-            <DropdownMenuLabel>{t("header.workspaces")}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              {workspaces?.map((ws: any) => (
-                <DropdownMenuItem
-                  key={ws.id}
-                  onClick={() => handleOnClickWorkspace(ws)}
-                >
-                  {ws.color && (
-                    <WorkspaceAvatar color={ws.color} name={ws.name} />
-                  )}
-                  <span className="ml-2">{ws.name}</span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuGroup>
-
-            {canCreateWorkspace && (
+            <DropdownMenuContent>
+              <DropdownMenuLabel>{t("header.workspaces")}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuItem onClick={onCreateWorkspace}>
-                  <PlusCircle className="w-4 h-4 mr-2" /> {t("header.createWorkspace")}
-                </DropdownMenuItem>
+                {workspaces?.map((ws: any) => (
+                  <DropdownMenuItem
+                    key={ws.id}
+                    onClick={() => handleOnClickWorkspace(ws)}
+                  >
+                    {ws.color && (
+                      <WorkspaceAvatar color={ws.color} name={ws.name} />
+                    )}
+                    <span className="ml-2">{ws.name}</span>
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuGroup>
-            )}
 
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {canCreateWorkspace && (
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onClick={onCreateWorkspace}>
+                    <PlusCircle className="w-4 h-4 mr-2" /> {t("header.createWorkspace")}
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              )}
+
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
         <div className="flex items-center gap-2">
           <DropdownMenu>

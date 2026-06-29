@@ -15,6 +15,7 @@ interface SidebarNavProps extends React.HTMLAttributes<HTMLDivElement> {
   currentWorkspace: Workspace | null;
   chatUnreadCount?: number;
   className?: string;
+  onItemClick?: () => void;
 }
 
 export const SidebarNav = ({
@@ -23,6 +24,7 @@ export const SidebarNav = ({
   className,
   currentWorkspace,
   chatUnreadCount = 0,
+  onItemClick,
   ...props
 }: SidebarNavProps) => {
   const location = useLocation();
@@ -63,6 +65,7 @@ export const SidebarNav = ({
           }
           // Blur button after click to remove focus state
           e.currentTarget.blur();
+          onItemClick?.();
         };
         const isChatItem = el.href === "/chat";
         const showBadge = isChatItem && chatUnreadCount > 0;

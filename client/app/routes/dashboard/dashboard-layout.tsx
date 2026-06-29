@@ -30,6 +30,7 @@ const DashBoardLayout = () => {
   const revalidator = useRevalidator();
   const { workspaces } = useLoaderData() as { workspaces: Workspace[] };
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
 
   // Refetch workspaces when user changes (after login)
@@ -48,14 +49,21 @@ const DashBoardLayout = () => {
     }
   }, [user?.id, isAuthenticated, isLoading, revalidator]);
 
-  // Load saved workspace from localStorage on mount
+  // Load saved workspace from localStorage on mount and sync
   useEffect(() => {
-    const savedWorkspaceId = localStorage.getItem('selectedWorkspaceId');
-    if (savedWorkspaceId && workspaces) {
+    if (workspaces && workspaces.length > 0) {
+      const savedWorkspaceId = localStorage.getItem('selectedWorkspaceId');
       const workspace = workspaces.find((ws: Workspace) => ws.id === savedWorkspaceId);
       if (workspace) {
         setCurrentWorkspace(workspace);
+      } else {
+        // Fallback to first workspace if saved one is not found or is invalid for this user
+        setCurrentWorkspace(workspaces[0]);
+        localStorage.setItem('selectedWorkspaceId', workspaces[0].id);
       }
+    } else {
+      setCurrentWorkspace(null);
+      localStorage.removeItem('selectedWorkspaceId');
     }
   }, [workspaces]);
 
@@ -133,15 +141,33 @@ const DashBoardLayout = () => {
     location.pathname === "/my-tasks";
 
   return (
-  <div className="flex h-screen w-full overflow-hidden">
-      {/* <Sidebar Components */}
-      <SidebarComponent currentWorkspace={currentWorkspace}/>
+    <div className="flex h-screen w-full overflow-hidden relative">
+      {/* Desktop Sidebar Component */}
+      <SidebarComponent currentWorkspace={currentWorkspace} />
+      
+      {/* Mobile Sidebar Overlay */}
+      {isMobileSidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 transition-opacity md:hidden"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
+      {/* Mobile Sidebar Component */}
+      <SidebarComponent 
+        currentWorkspace={currentWorkspace}
+        isOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
+        isMobile
+      />
+
       <div className="flex flex-1 flex-col h-full min-w-0">
         {/* Header */}
         <Header
           onWorkspaceSelected = {(workspace) => handleWorkspaceSelected(workspace)}
           selectedWorkspace = {currentWorkspace}
           onCreateWorkspace = {() => setIsCreatingWorkspace(true)}
+          onMenuToggle = {() => setIsMobileSidebarOpen(true)}
         />
         {/* Chỉ content được scroll; sidebar cố định */}
         <main
@@ -159,8 +185,8 @@ const DashBoardLayout = () => {
         </main>
       </div>
       <CreateWorkspace 
-      isCreatingWorkspace = {isCreatingWorkspace}
-      setIsCreatingWorkspace = {setIsCreatingWorkspace}
+        isCreatingWorkspace = {isCreatingWorkspace}
+        setIsCreatingWorkspace = {setIsCreatingWorkspace}
       />
     </div>
   );

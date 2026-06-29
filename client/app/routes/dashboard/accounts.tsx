@@ -878,7 +878,145 @@ const AccountsPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+          {/* Mobile View: Accounts Cards */}
+          <div className="block md:hidden space-y-4">
+            {isLoading && (
+              <div className="text-center py-6 text-slate-500 bg-white border border-slate-200 rounded-lg">
+                Đang tải danh sách tài khoản...
+              </div>
+            )}
+            {!isLoading && (!data || data.length === 0) && (
+              <div className="text-center py-6 text-slate-500 bg-white border border-slate-200 rounded-lg">
+                Chưa có tài khoản nào.
+              </div>
+            )}
+            {!isLoading &&
+              data &&
+              data.map((u) => (
+                <div
+                  key={u.id}
+                  className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm hover:border-blue-500 transition-colors space-y-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="size-10 shrink-0">
+                      <AvatarImage src={u.avatarUrl || undefined} alt={u.username} />
+                      <AvatarFallback className="text-xs font-semibold">
+                        {userInitials(u.username)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-slate-800 truncate">{u.username}</h3>
+                      <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 items-center justify-between text-xs pt-2 border-t">
+                    <div className="flex gap-1.5 items-center">
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium border border-slate-200">
+                        {u.role}
+                      </span>
+                      {u.isActive !== false ? (
+                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                          Hoạt động
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
+                          Bị khóa
+                        </span>
+                      )}
+                    </div>
+                    {u.kpiScore != null && u.kpiScore !== undefined ? (
+                      <div className="font-mono text-slate-700">
+                        KPI: {Number(u.kpiScore).toFixed(3)}
+                        {u.kpiModelAtSignup ? (
+                          <span className="text-slate-400 ml-1">({u.kpiModelAtSignup})</span>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="text-slate-400">KPI: —</div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs flex items-center gap-1"
+                      onClick={() =>
+                        openEditDialog({
+                          id: u.id,
+                          username: u.username,
+                          email: u.email,
+                          role: u.role,
+                          avatarUrl: u.avatarUrl,
+                          cpa: u.cpa ?? null,
+                          interviewScore: u.interviewScore ?? null,
+                          cvScore: u.cvScore ?? null,
+                          yearsExperience: u.yearsExperience ?? 0,
+                          numProjectsPrior: u.numProjectsPrior ?? 0,
+                          yearsAtCompany: u.yearsAtCompany ?? 0,
+                          kpiScore: u.kpiScore ?? null,
+                          kpiModelAtSignup: u.kpiModelAtSignup ?? null,
+                        })
+                      }
+                    >
+                      <Pencil className="w-3.5 h-3.5" /> Sửa
+                    </Button>
+                    {user?.id !== u.id && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs flex items-center gap-1 border-slate-200"
+                        title={u.isActive !== false ? "Khóa tài khoản" : "Mở khóa tài khoản"}
+                        onClick={() => {
+                          const nextState = u.isActive === false;
+                          if (
+                            window.confirm(
+                              `Bạn có chắc chắn muốn ${nextState ? "mở khóa" : "khóa"} tài khoản ${u.email}?`
+                            )
+                          ) {
+                            toggleStatusMutation.mutate({ id: u.id, isActive: nextState });
+                          }
+                        }}
+                      >
+                        {u.isActive !== false ? (
+                          <>
+                            <Lock className="w-3.5 h-3.5 text-red-500" />
+                            <span className="text-red-500">Khóa</span>
+                          </>
+                        ) : (
+                          <>
+                            <Unlock className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="text-emerald-500">Mở</span>
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    {user?.id !== u.id && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs flex items-center gap-1 border-red-500/60 text-red-500 hover:bg-red-50"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Bạn có chắc chắn muốn xóa tài khoản ${u.email}?`
+                            )
+                          ) {
+                            deleteMutation.mutate(u.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-500" /> Xóa
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+          </div>
+
+          {/* Desktop View: Accounts Table */}
+          <div className="hidden md:block overflow-x-auto rounded-lg border border-slate-200 bg-white">
             <table className="min-w-full text-sm">
               <thead className="bg-blue-50">
                 <tr>

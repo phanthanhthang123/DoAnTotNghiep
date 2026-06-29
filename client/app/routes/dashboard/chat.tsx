@@ -138,7 +138,7 @@ const ChatPage = () => {
   const isOwnerOfActiveGroup = useMemo(() => {
     if (!activeConversation || activeConversation.type !== "group") return false;
     const currentMember = activeConversation.members?.find((m) => String(m.user_id) === String(user?.id));
-    return currentMember?.role === "owner" || String(activeConversation.created_by) === String(user?.id);
+    return currentMember?.role === "owner" || String(activeConversation?.created_by) === String(user?.id);
   }, [activeConversation, user?.id]);
 
   const usersNotInGroup = useMemo(() => {
@@ -777,9 +777,8 @@ const ChatPage = () => {
                   <button
                     key={conversation.id}
                     onClick={() => setActiveConversationId(conversation.id)}
-                    className={`w-full text-left p-2 rounded border ${
-                      activeConversationId === conversation.id ? "bg-blue-50 border-blue-200" : "hover:bg-muted"
-                    }`}
+                    className={`w-full text-left p-2 rounded border ${activeConversationId === conversation.id ? "bg-blue-50 border-blue-200" : "hover:bg-muted"
+                      }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -798,7 +797,7 @@ const ChatPage = () => {
                       </div>
                       {!!conversation.unreadCount && <Badge variant="destructive">{conversation.unreadCount}</Badge>}
                     </div>
-                  <div className="text-xs text-muted-foreground mt-1 truncate max-w-[220px]">
+                    <div className="text-xs text-muted-foreground mt-1 truncate max-w-[220px]">
                       {conversation.lastMessage?.content || "Chưa có tin nhắn"}
                     </div>
                     {conversation.type === "direct" && (
@@ -822,7 +821,7 @@ const ChatPage = () => {
                     const activeTitle = getConversationTitle(activeConversation);
                     const activeInitials = chatUserInitials(activeTitle);
                     const activeBg = getAvatarBgColor(activeTitle);
-                    
+
                     return (
                       <Avatar className={`h-11 w-11 shrink-0 rounded-full border ${activeBg}`}>
                         {headerDirectPeer?.avatarUrl && (
@@ -973,31 +972,30 @@ const ChatPage = () => {
               <div ref={messageScrollContainerRef} className="flex-1 min-h-0">
                 <ScrollArea className="h-full p-4">
                   <div className="space-y-3 pb-2">
-                  {sortedMessages.map((message) => {
-                    if (message.type === "system") {
-                      return (
-                        <div key={message.id} className="flex justify-center w-full my-1.5">
-                          <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200/60 shadow-sm">
-                            {message.content}
-                          </span>
-                        </div>
-                      );
-                    }
+                    {sortedMessages.map((message) => {
+                      if (message.type === "system") {
+                        return (
+                          <div key={message.id} className="flex justify-center w-full my-1.5">
+                            <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200/60 shadow-sm">
+                              {message.content}
+                            </span>
+                          </div>
+                        );
+                      }
 
-                    const mine = message.sender_id === user?.id;
-                    const isEditing = editingMessageId === message.id;
-                    const profile = mine
-                      ? {
+                      const mine = message.sender_id === user?.id;
+                      const isEditing = editingMessageId === message.id;
+                      const profile = mine
+                        ? {
                           username: user?.username || "Bạn",
                           avatarUrl: user?.avatarUrl ?? null,
                         }
-                      : resolveChatProfile(message.sender_id, message.sender);
+                        : resolveChatProfile(message.sender_id, message.sender);
 
-                    const bubble = (
+                      const bubble = (
                         <div
-                          className={`max-w-[min(70vw,28rem)] rounded-lg px-3 py-2 text-sm ${
-                            mine ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-900"
-                          }`}
+                          className={`max-w-[min(70vw,28rem)] rounded-lg px-3 py-2 text-sm ${mine ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-900"
+                            }`}
                         >
                           {!mine && (
                             <div className="text-[11px] opacity-70 mb-1">{profile.username}</div>
@@ -1032,81 +1030,80 @@ const ChatPage = () => {
                             {message.is_pinned ? " · đã ghim" : ""}
                           </div>
                         </div>
-                    );
+                      );
 
-                    const menu = !isEditing ? (
-                          <div className="shrink-0 self-start opacity-0 group-hover:opacity-100 transition-opacity">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="size-7">
-                                  <MoreHorizontal className="size-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align={mine ? "start" : "end"}>
-                                {mine ? (
-                                  <DropdownMenuItem onClick={() => handleStartEditMessage(message.id, message.content)}>
-                                    <Pencil className="size-4 mr-2" /> Chỉnh sửa
-                                  </DropdownMenuItem>
-                                ) : null}
-                                <DropdownMenuItem
-                                  onClick={() => handleTogglePinMessage(message.id, !message.is_pinned)}
-                                >
-                                  <Pin className="size-4 mr-2" /> {message.is_pinned ? "Bỏ ghim" : "Ghim"}
+                      const menu = !isEditing ? (
+                        <div className="shrink-0 self-start opacity-0 group-hover:opacity-100 transition-opacity">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-7">
+                                <MoreHorizontal className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align={mine ? "start" : "end"}>
+                              {mine ? (
+                                <DropdownMenuItem onClick={() => handleStartEditMessage(message.id, message.content)}>
+                                  <Pencil className="size-4 mr-2" /> Chỉnh sửa
                                 </DropdownMenuItem>
-                                {mine ? (
-                                  <DropdownMenuItem
-                                    onClick={() => handleDeleteMessage(message.id)}
-                                    className="text-red-600"
-                                  >
-                                    <Trash2 className="size-4 mr-2" /> Xóa
-                                  </DropdownMenuItem>
-                                ) : null}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                    ) : null;
+                              ) : null}
+                              <DropdownMenuItem
+                                onClick={() => handleTogglePinMessage(message.id, !message.is_pinned)}
+                              >
+                                <Pin className="size-4 mr-2" /> {message.is_pinned ? "Bỏ ghim" : "Ghim"}
+                              </DropdownMenuItem>
+                              {mine ? (
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="size-4 mr-2" /> Xóa
+                                </DropdownMenuItem>
+                              ) : null}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ) : null;
 
-                    return (
-                      <div
-                        key={message.id}
-                        ref={(el) => {
-                          messageRefs.current[message.id] = el;
-                        }}
-                        className={`flex w-full group ${
-                          mine ? "justify-end" : "justify-start"
-                        } ${focusedMessageId === message.id ? "ring-2 ring-amber-300 rounded-md" : ""}`}
-                      >
-                        {mine ? (
-                          <div className="flex max-w-[min(92%,36rem)] flex-row-reverse items-end gap-2">
-                            <Avatar className="h-10 w-10 min-h-10 min-w-10 shrink-0 rounded-full border border-slate-200 bg-muted">
-                              <AvatarImage src={profile.avatarUrl || undefined} alt={profile.username || ""} />
-                              <AvatarFallback className="text-xs font-semibold">
-                                {chatUserInitials(profile.username)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex min-w-0 flex-row-reverse items-start gap-1">
-                              {bubble}
-                              {menu}
+                      return (
+                        <div
+                          key={message.id}
+                          ref={(el) => {
+                            messageRefs.current[message.id] = el;
+                          }}
+                          className={`flex w-full group ${mine ? "justify-end" : "justify-start"
+                            } ${focusedMessageId === message.id ? "ring-2 ring-amber-300 rounded-md" : ""}`}
+                        >
+                          {mine ? (
+                            <div className="flex max-w-[min(92%,36rem)] flex-row-reverse items-end gap-2">
+                              <Avatar className="h-10 w-10 min-h-10 min-w-10 shrink-0 rounded-full border border-slate-200 bg-muted">
+                                <AvatarImage src={profile.avatarUrl || undefined} alt={profile.username || ""} />
+                                <AvatarFallback className="text-xs font-semibold">
+                                  {chatUserInitials(profile.username)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex min-w-0 flex-row-reverse items-start gap-1">
+                                {bubble}
+                                {menu}
+                              </div>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="flex max-w-[min(92%,36rem)] items-end gap-2">
-                            <Avatar className="h-10 w-10 min-h-10 min-w-10 shrink-0 rounded-full border border-slate-200 bg-muted">
-                              <AvatarImage src={profile.avatarUrl || undefined} alt={profile.username || ""} />
-                              <AvatarFallback className="text-xs font-semibold">
-                                {chatUserInitials(profile.username)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex min-w-0 items-start gap-1">
-                              {bubble}
-                              {menu}
+                          ) : (
+                            <div className="flex max-w-[min(92%,36rem)] items-end gap-2">
+                              <Avatar className="h-10 w-10 min-h-10 min-w-10 shrink-0 rounded-full border border-slate-200 bg-muted">
+                                <AvatarImage src={profile.avatarUrl || undefined} alt={profile.username || ""} />
+                                <AvatarFallback className="text-xs font-semibold">
+                                  {chatUserInitials(profile.username)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex min-w-0 items-start gap-1">
+                                {bubble}
+                                {menu}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  <div ref={messageEndRef} />
+                          )}
+                        </div>
+                      );
+                    })}
+                    <div ref={messageEndRef} />
                   </div>
                 </ScrollArea>
               </div>
@@ -1238,7 +1235,7 @@ const ChatPage = () => {
                                 </div>
                               </div>
                             </div>
-                            
+
                             {/* Actions on members */}
                             <div className="flex gap-1 shrink-0 items-center">
                               {isOwnerOfActiveGroup && !isMe && (

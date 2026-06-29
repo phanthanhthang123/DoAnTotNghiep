@@ -1,33 +1,51 @@
 import React from 'react'
 import { useNavigate, useSearchParams } from 'react-router';
-import { useGetWorkspaceStatsQuery } from '@/hooks/use-workspace';
+import { useGetWorkspaceQuery, useGetWorkspaceStatsQuery } from '@/hooks/use-workspace';
 import { Loader } from '@/components/loader';
 import { NoDataFound } from '@/components/workspace/no-data-found';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { StatisticsCharts } from '@/components/dashboard/statistics-charts';
+import { useAuth } from '@/provider/auth-context';
 
 const DashBoard = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  // Get all workspaces this user is member of
+  const { data: workspaces, isLoading: isLoadingWorkspaces } = useGetWorkspaceQuery(user?.id || "");
+
   const savedWorkspaceId =
     typeof window !== "undefined" ? localStorage.getItem("selectedWorkspaceId") || "" : "";
-  const workspaceId = searchParams.get('workspaceId') || savedWorkspaceId;
+  const workspaceIdFromParams = searchParams.get('workspaceId');
 
-  const { data, isLoading } = useGetWorkspaceStatsQuery(workspaceId);
+  // Verify that the requested workspaceId is valid for the current user
+  const userWorkspaceIds = workspaces?.map(ws => ws.id) || [];
+  
+  let workspaceId = "";
+  if (workspaceIdFromParams && userWorkspaceIds.includes(workspaceIdFromParams)) {
+    workspaceId = workspaceIdFromParams;
+  } else if (savedWorkspaceId && userWorkspaceIds.includes(savedWorkspaceId)) {
+    workspaceId = savedWorkspaceId;
+  } else if (userWorkspaceIds.length > 0) {
+    workspaceId = userWorkspaceIds[0];
+  }
+
+  const { data, isLoading: isLoadingStats } = useGetWorkspaceStatsQuery(workspaceId);
+
+  if (isLoadingWorkspaces || (workspaceId && isLoadingStats)) {
+    return <Loader />
+  }
 
   if (!workspaceId) {
     return (
       <NoDataFound
-        title="Chưa chọn không gian làm việc"
-        description="Hãy chọn một workspace ở thanh trên để xem thống kê."
-        buttonText="Đi tới không gian làm việc"
+        title="Bạn chưa tham gia không gian làm việc nào"
+        description="Hãy tạo mới không gian làm việc hoặc yêu cầu Leader/Admin thêm bạn vào để xem dữ liệu thống kê."
+        buttonText="Đi tới danh sách không gian"
         buttonAction={() => navigate("/workspaces")}
       />
     );
-  }
-
-  if (isLoading) {
-    return <Loader />
   }
   // Type assertion for workspace stats response
   type WorkspaceStatsData = {
