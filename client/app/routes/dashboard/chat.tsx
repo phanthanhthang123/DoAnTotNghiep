@@ -24,7 +24,8 @@ import {
   useTypingState,
 } from "@/hooks/use-chat";
 import { Phone, Video } from "lucide-react";
-import { MoreHorizontal, Pin, Pencil, Trash2, Plus, Users, LogOut, UserPlus } from "lucide-react";
+import { MoreHorizontal, Pin, Pencil, Trash2, Plus, Users, LogOut, UserPlus, Paperclip, X, CornerUpLeft, FileText, ImageIcon, Loader2 } from "lucide-react";
+import { postFormData } from "@/lib/fetch-utlis";
 import type { Conversation, Message, User } from "@/type";
 import {
   DropdownMenu,
@@ -110,6 +111,9 @@ const ChatPage = () => {
   const [editingText, setEditingText] = useState("");
   const [showPinnedPanel, setShowPinnedPanel] = useState(false);
   const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null);
+  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const peerRef = useRef<RTCPeerConnection | null>(null);
@@ -431,11 +435,53 @@ const ChatPage = () => {
       : null;
 
   const handleSendMessage = async () => {
-    if (!activeConversationId || !messageInput.trim()) return;
+    if (!activeConversationId) return;
+    const hasText = messageInput.trim().length > 0;
+    const hasAttachment = !!attachmentFile;
+    if (!hasText && !hasAttachment) return;
+
     shouldAutoScrollRef.current = true;
-    socket.emit("message:send", { conversationId: activeConversationId, content: messageInput.trim() });
-    socket.emit("typing:stop", { conversationId: activeConversationId });
-    setMessageInput("");
+    let finalUrl = null;
+    let msgType: 'text' | 'image' | 'file' = 'text';
+
+    try {
+      if (hasAttachment) {
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append("file", attachmentFile!);
+        const res = await postFormData<{
+          err: number;
+          msg: string;
+          response: { url: string; mimetype: string; filename: string };
+        }>("/chat/upload", formData);
+
+        if (res?.err) {
+          alert("Lỗi tải tệp: " + res.msg);
+          setIsUploading(false);
+          return;
+        }
+
+        finalUrl = res.response.url;
+        msgType = res.response.mimetype.startsWith("image/") ? "image" : "file";
+      }
+
+      socket.emit("message:send", {
+        conversationId: activeConversationId,
+        content: messageInput.trim() || (attachmentFile ? attachmentFile.name : ""),
+        type: msgType,
+        attachment_url: finalUrl,
+        reply_to_id: replyToMessage?.id,
+      });
+
+      socket.emit("typing:stop", { conversationId: activeConversationId });
+      setMessageInput("");
+      setAttachmentFile(null);
+      setReplyToMessage(null);
+    } catch (err: any) {
+      alert("Gửi tin nhắn thất bại: " + (err.message || err));
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleStartEditMessage = (messageId: string, content: string) => {
@@ -782,29 +828,40 @@ const ChatPage = () => {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <Avatar className={`h-10 w-10 min-h-10 min-w-10 shrink-0 rounded-full border ${bgClass}`}>
-                          {listPeerUi?.avatarUrl && (
-                            <AvatarImage
-                              src={listPeerUi.avatarUrl}
-                              alt={title}
-                            />
+                        <div className="relative">
+                          <Avatar className={`h-10 w-10 min-h-10 min-w-10 shrink-0 rounded-full border ${bgClass}`}>
+                            {listPeerUi?.avatarUrl && (
+                              <AvatarImage
+                                src={listPeerUi.avatarUrl}
+                                alt={title}
+                              />
+                            )}
+                            <AvatarFallback className="text-xs font-semibold bg-transparent">
+                              {initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          {isOnline && (
+                            <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-white bg-emerald-500 shadow-sm" />
                           )}
-                          <AvatarFallback className="text-xs font-semibold bg-transparent">
-                            {initials}
-                          </AvatarFallback>
-                        </Avatar>
+                        </div>
                         <span className="font-medium text-sm truncate">{title}</span>
                       </div>
-                      {!!conversation.unreadCount && <Badge variant="destructive">{conversation.unreadCount}</Badge>}
+                      {!!conversation.unreadCount && (
+                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white shadow-sm shrink-0">
+                          {conversation.unreadCount}
+                        </span>
+                      )}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1 truncate max-w-[220px]">
-                      {conversation.lastMessage?.content || "Chưa có tin nhắn"}
+                    <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
+                      <span className="truncate max-w-[150px]">
+                        {conversation.lastMessage?.content || "Chưa có tin nhắn"}
+                      </span>
+                      {conversation.type === "direct" && (
+                        <span className={isOnline ? "text-emerald-600 font-medium text-[10px]" : "text-slate-400 text-[10px]"}>
+                          {isOnline ? "Online" : "Offline"}
+                        </span>
+                      )}
                     </div>
-                    {conversation.type === "direct" && (
-                      <div className="mt-1">
-                        <Badge variant={isOnline ? "default" : "outline"}>{presenceText}</Badge>
-                      </div>
-                    )}
                   </button>
                 );
               })}
@@ -998,8 +1055,34 @@ const ChatPage = () => {
                             }`}
                         >
                           {!mine && (
-                            <div className="text-[11px] opacity-70 mb-1">{profile.username}</div>
+                            <div className="text-[11px] opacity-70 mb-1 font-semibold">{profile.username}</div>
                           )}
+
+                          {/* Reply Reference Preview inside Bubble */}
+                          {message.replyTo && (
+                            <div
+                              onClick={() => focusMessageById(message.replyTo!.id)}
+                              className={`mb-2 p-1.5 rounded text-xs border-l-2 cursor-pointer select-none transition-colors text-left ${
+                                mine
+                                  ? "bg-blue-700/50 border-blue-300 text-blue-100 hover:bg-blue-800/50"
+                                  : "bg-slate-200/60 border-slate-400 text-slate-600 hover:bg-slate-300/40"
+                              }`}
+                            >
+                              <p className="font-semibold text-[9px] opacity-90 truncate">
+                                {message.replyTo.sender_id === user?.id
+                                  ? "Bạn"
+                                  : message.replyTo.sender?.username || "Người dùng"}
+                              </p>
+                              <p className="line-clamp-1 opacity-85 text-[10px]">
+                                {message.replyTo.type === "image"
+                                  ? "[Hình ảnh]"
+                                  : message.replyTo.type === "file"
+                                  ? `[Tệp] ${message.replyTo.content}`
+                                  : message.replyTo.content}
+                              </p>
+                            </div>
+                          )}
+
                           {isEditing ? (
                             <div className="space-y-2">
                               <Input
@@ -1022,11 +1105,55 @@ const ChatPage = () => {
                               </div>
                             </div>
                           ) : (
-                            <div>{message.content}</div>
+                            <div className="space-y-1.5 break-words">
+                              {/* RENDER ATTACHMENT */}
+                              {message.type === "image" && message.attachment_url && (
+                                <div className="max-w-full overflow-hidden rounded border bg-slate-50/5">
+                                  <a
+                                    href={message.attachment_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block hover:opacity-90 transition-opacity"
+                                  >
+                                    <img
+                                      src={message.attachment_url}
+                                      alt={message.content || "Hình ảnh"}
+                                      className="max-h-48 rounded object-cover mx-auto"
+                                    />
+                                  </a>
+                                </div>
+                              )}
+                              {message.type === "file" && message.attachment_url && (
+                                <div className={`flex items-center gap-2 p-2 rounded border text-xs text-left ${
+                                  mine
+                                    ? "bg-blue-700/40 border-blue-400 text-blue-50"
+                                    : "bg-slate-200/50 border-slate-300 text-slate-700"
+                                }`}>
+                                  <FileText className="size-4 shrink-0" />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-semibold truncate">{message.content}</p>
+                                    <a
+                                      href={message.attachment_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`text-[10px] underline hover:opacity-80 block mt-0.5 ${
+                                        mine ? "text-blue-200" : "text-blue-600"
+                                      }`}
+                                    >
+                                      Tải xuống
+                                    </a>
+                                  </div>
+                                </div>
+                              )}
+                              {/* TEXT CONTENT */}
+                              {(message.type === "text" || !message.attachment_url) && (
+                                <div>{message.content}</div>
+                              )}
+                            </div>
                           )}
-                          <div className={`mt-1 text-[11px] ${mine ? "text-blue-100" : "text-slate-500"}`}>
+                          <div className={`mt-1 text-[9px] text-right ${mine ? "text-blue-100/80" : "text-slate-400"}`}>
                             {formatMessageTime(message.createdAt)}
-                            {message.edited_at ? " · đã chỉnh sửa" : ""}
+                            {message.edited_at ? " · đã sửa" : ""}
                             {message.is_pinned ? " · đã ghim" : ""}
                           </div>
                         </div>
@@ -1041,6 +1168,9 @@ const ChatPage = () => {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align={mine ? "start" : "end"}>
+                              <DropdownMenuItem onClick={() => setReplyToMessage(message)}>
+                                <CornerUpLeft className="size-4 mr-2" /> Trả lời
+                              </DropdownMenuItem>
                               {mine ? (
                                 <DropdownMenuItem onClick={() => handleStartEditMessage(message.id, message.content)}>
                                   <Pencil className="size-4 mr-2" /> Chỉnh sửa
@@ -1103,16 +1233,103 @@ const ChatPage = () => {
                         </div>
                       );
                     })}
+                    {/* typing indicator */}
+                    {typingUserIds.length > 0 && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground italic px-2 py-1 select-none animate-in fade-in duration-200">
+                        <div className="flex gap-1 items-center shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                        <span>Đang nhập...</span>
+                      </div>
+                    )}
                     <div ref={messageEndRef} />
                   </div>
                 </ScrollArea>
               </div>
 
-              <div className="p-3 border-t flex gap-2 bg-white min-w-0">
+              {/* REPLY PREVIEW BAR */}
+              {replyToMessage && (
+                <div className="px-3 py-2 bg-slate-50 border-t flex items-center justify-between text-xs text-slate-700 animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CornerUpLeft className="size-3.5 text-blue-500 shrink-0" />
+                    <div className="min-w-0">
+                      <span className="font-semibold">
+                        Trả lời {replyToMessage.sender_id === user?.id ? "chính mình" : replyToMessage.sender?.username || "Người dùng"}
+                      </span>
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                        {replyToMessage.type === "image" ? "[Hình ảnh]" : replyToMessage.type === "file" ? `[Tệp] ${replyToMessage.content}` : replyToMessage.content}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-5 hover:bg-slate-200 rounded-full"
+                    onClick={() => setReplyToMessage(null)}
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </div>
+              )}
+
+              {/* ATTACHMENT PREVIEW BAR */}
+              {attachmentFile && (
+                <div className="px-3 py-2 bg-slate-50 border-t flex items-center justify-between text-xs text-slate-700 animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {attachmentFile.type.startsWith("image/") ? (
+                      <ImageIcon className="size-3.5 text-emerald-500 shrink-0" />
+                    ) : (
+                      <FileText className="size-3.5 text-blue-500 shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <span className="font-semibold truncate block max-w-xs">{attachmentFile.name}</span>
+                      <span className="text-[10px] text-slate-500 block">{(attachmentFile.size / 1024).toFixed(1)} KB</span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-5 hover:bg-slate-200 rounded-full"
+                    disabled={isUploading}
+                    onClick={() => setAttachmentFile(null)}
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </div>
+              )}
+
+              <div className="p-3 border-t flex gap-2 bg-white min-w-0 items-center">
+                <input
+                  type="file"
+                  id="chat-file-input"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setAttachmentFile(file);
+                    }
+                    e.target.value = "";
+                  }}
+                  disabled={isUploading}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                  disabled={isUploading}
+                  onClick={() => document.getElementById("chat-file-input")?.click()}
+                  type="button"
+                >
+                  <Paperclip className="size-5" />
+                </Button>
+
                 <Input
                   className="flex-1 min-w-0"
                   placeholder="Nhập tin nhắn..."
                   value={messageInput}
+                  disabled={isUploading}
                   onChange={(e) => {
                     setMessageInput(e.target.value);
                     if (activeConversationId) {
@@ -1126,8 +1343,19 @@ const ChatPage = () => {
                     if (e.key === "Enter") handleSendMessage();
                   }}
                 />
-                <Button className="shrink-0 min-w-16" onClick={handleSendMessage} disabled={!messageInput.trim()}>
-                  Gửi
+                <Button
+                  className="shrink-0 min-w-16 gap-1"
+                  onClick={handleSendMessage}
+                  disabled={(!messageInput.trim() && !attachmentFile) || isUploading}
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      <span>Đang tải</span>
+                    </>
+                  ) : (
+                    "Gửi"
+                  )}
                 </Button>
               </div>
 

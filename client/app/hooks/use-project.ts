@@ -86,6 +86,23 @@ export const useUpdateProjectDescriptionMutation = () => {
     });
 }
 
+export const useUpdateProjectStatusMutation = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (data: { projectId: string; status: string }) => {
+            return await updateData(`/project/${data.projectId}/update-status`, { status: data.status });
+        },
+        onSuccess: (response: any, variables) => {
+            queryClient.invalidateQueries({ queryKey: ["project", variables.projectId] });
+            toast.success("Cập nhật trạng thái dự án thành công");
+        },
+        onError: (error: any) => {
+            const errorMessage = error?.response?.data?.msg || "Không thể cập nhật trạng thái dự án";
+            toast.error(errorMessage);
+        }
+    });
+}
+
 export const useAddMemberToProjectMutation = () => {
     const queryClient = useQueryClient();
     return useMutation({

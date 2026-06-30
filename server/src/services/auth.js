@@ -222,23 +222,39 @@ const transporter = nodemailer.createTransport({
 const sendResetPasswordEmail = async (toEmail, resetToken) => {
     const resetLink = `${process.env.URL_REACT}/reset-password?token=${resetToken}`; // URL frontend
     let mailOptions = {
-        from: '"SmartHR" <your_email@gmail.com>', // Tên thương hiệu + email gửi
+        from: '"MentorHub" <your_email@gmail.com>', // Tên thương hiệu + email gửi
         to: toEmail,
-        subject: '[SmartHR] Yêu cầu đặt lại mật khẩu tài khoản của bạn',
-        text: `Xin chào,\n\nBạn vừa gửi yêu cầu đặt lại mật khẩu cho tài khoản SmartHR của mình.\nVui lòng nhấn vào liên kết sau để đặt lại mật khẩu mới (liên kết này sẽ hết hạn sau 1 giờ):\n\n${resetLink}\n\nNếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này. Mật khẩu của bạn sẽ không bị thay đổi.\n\nCảm ơn bạn đã sử dụng SmartHR.\nĐội ngũ SmartHR`,
-        html: `<div style="font-family: Arial, sans-serif; color: #222;">
-          <h2 style="color: #1976d2;">Xin chào,</h2>
-          <p>Bạn vừa gửi yêu cầu <b>đặt lại mật khẩu</b> cho tài khoản SmartHR của mình.</p>
-          <p>Vui lòng nhấn vào nút bên dưới để đặt lại mật khẩu mới:</p>
-          <div style="margin: 24px 0;">
-            <a href="${resetLink}" style="background: #1976d2; color: #fff; padding: 12px 24px; border-radius: 4px; text-decoration: none; font-weight: bold;">
-              Đặt lại mật khẩu
-            </a>
-          </div>
-          <p>Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này. Mật khẩu của bạn sẽ không bị thay đổi.</p>
-          <p style="color: #888; font-size: 13px;">Liên kết này sẽ hết hạn sau 15 phút vì lý do bảo mật.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;">
-          <p style="font-size: 13px; color: #888;">Cảm ơn bạn đã sử dụng SmartHR.<br>Đội ngũ SmartHR</p>
+        subject: '[MentorHub] Yêu cầu đặt lại mật khẩu tài khoản của bạn',
+        text: `Xin chào,\n\nBạn vừa gửi yêu cầu đặt lại mật khẩu cho tài khoản MentorHub của mình.\nVui lòng nhấn vào liên kết sau để đặt lại mật khẩu mới (liên kết này sẽ hết hạn sau 15 phút):\n\n${resetLink}\n\nNếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này. Mật khẩu của bạn sẽ không bị thay đổi.\n\nCảm ơn bạn đã sử dụng MentorHub.\nĐội ngũ phát triển MentorHub`,
+        html: `<div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <div style="background: linear-gradient(135deg, #2563eb, #1d4ed8); padding: 24px; text-align: center; color: #fff;">
+              <h1 style="margin: 0; font-size: 24px; font-weight: 700;">Đặt lại mật khẩu</h1>
+              <p style="margin: 8px 0 0; opacity: 0.9; font-size: 15px;">Khôi phục tài khoản MentorHub của bạn</p>
+            </div>
+            <div style="padding: 24px; background-color: #fff;">
+              <h2 style="color: #1e3a8a; margin-top: 0; font-size: 18px;">Xin chào,</h2>
+              <p style="line-height: 1.6; font-size: 15px;">Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn trên hệ thống <b>MentorHub</b>.</p>
+              <p style="line-height: 1.6; font-size: 15px;">Vui lòng nhấn vào nút bên dưới để tiến hành đặt mật khẩu mới:</p>
+              
+              <div style="margin: 28px 0; text-align: center;">
+                <a href="${resetLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+                  Đặt lại mật khẩu
+                </a>
+              </div>
+              
+              <p style="line-height: 1.6; font-size: 15px;">Nếu nút trên không hoạt động, bạn cũng có thể sao chép và dán liên kết sau vào thanh địa chỉ của trình duyệt:</p>
+              <p style="word-break: break-all; font-family: monospace; font-size: 13px; color: #2563eb;"><a href="${resetLink}" style="color: #2563eb; text-decoration: underline;">${resetLink}</a></p>
+              
+              <p style="color: #ef4444; font-size: 13px; line-height: 1.5; font-style: italic; background-color: #fef2f2; padding: 12px; border-radius: 6px; border: 1px dashed #fca5a5; margin-top: 20px;">
+                * <strong>Lưu ý:</strong> Liên kết này chỉ có hiệu lực trong vòng 15 phút vì lý do bảo mật. Nếu bạn không gửi yêu cầu này, vui lòng bỏ qua email này. Mật khẩu của bạn vẫn được giữ an toàn.
+              </p>
+              
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;">
+              <p style="font-size: 13px; color: #9ca3af; margin: 0;">Cảm ơn bạn đã đồng hành cùng chúng tôi,<br><strong style="color: #4b5563;">Đội ngũ phát triển MentorHub</strong></p>
+            </div>
+            <div style="background-color: #f9fafb; padding: 16px; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #e5e7eb;">
+              Đây là email tự động từ hệ thống MentorHub. Vui lòng không phản hồi email này.
+            </div>
         </div>`
     };
 
@@ -421,26 +437,43 @@ const sendAdminCreatedUserCredentialsEmail = async (toEmail, username, plainPass
     const loginLink = `${process.env.URL_REACT}/sign-in`;
     const fromEmail = process.env.EMAIL_USER || "your_email@gmail.com";
     const mailOptions = {
-        from: `"SmartHR" <${fromEmail}>`,
+        from: `"MentorHub" <${fromEmail}>`,
         to: toEmail,
-        subject: "[SmartHR] Thông tin tài khoản đăng nhập",
-        text: `Xin chào ${username},\n\nBạn đã được tạo tài khoản SmartHR.\n\nEmail: ${toEmail}\nMật khẩu tạm: ${plainPassword}\n\nVui lòng đăng nhập tại: ${loginLink}\nSau lần đăng nhập đầu tiên, hệ thống sẽ yêu cầu đổi mật khẩu.\n\nTrân trọng,\nSmartHR`,
-        html: `<div style="font-family: Arial, sans-serif; color: #222;">
-            <h2 style="color: #1976d2;">Xin chào ${username},</h2>
-            <p>Bạn đã được tạo tài khoản <b>SmartHR</b>.</p>
-            <div style="margin: 16px 0; padding: 12px 16px; background: #f6f8fa; border-radius: 6px;">
-              <p style="margin: 0 0 6px;"><b>Email:</b> ${toEmail}</p>
-              <p style="margin: 0;"><b>Mật khẩu tạm:</b> <code>${plainPassword}</code></p>
+        subject: "[MentorHub] Thông tin tài khoản đăng nhập",
+        text: `Xin chào ${username},\n\nChào mừng bạn đến với MentorHub - Hệ thống Quản lý Dự án & Cố vấn Học tập.\n\nTài khoản của bạn đã được quản trị viên khởi tạo thành công trên hệ thống.\n\nThông tin đăng nhập:\n- Email: ${toEmail}\n- Mật khẩu tạm thời: ${plainPassword}\n\nVui lòng đăng nhập tại liên kết sau:\n${loginLink}\n\n* Lưu ý: Để bảo mật tài khoản, hệ thống sẽ yêu cầu bạn đổi mật khẩu mới ngay trong lần đăng nhập đầu tiên.\n\nTrân trọng,\nĐội ngũ phát triển MentorHub`,
+        html: `<div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <div style="background: linear-gradient(135deg, #2563eb, #1d4ed8); padding: 24px; text-align: center; color: #fff;">
+              <h1 style="margin: 0; font-size: 24px; font-weight: 700;">Chào mừng đến với MentorHub!</h1>
+              <p style="margin: 8px 0 0; opacity: 0.9; font-size: 15px;">Hệ thống Quản lý Dự án & Cố vấn Học tập</p>
             </div>
-            <p>Vui lòng đăng nhập tại:</p>
-            <div style="margin: 16px 0;">
-              <a href="${loginLink}" style="background: #1976d2; color: #fff; padding: 10px 18px; border-radius: 4px; text-decoration: none; font-weight: bold;">
-                Đăng nhập
-              </a>
+            <div style="padding: 24px; background-color: #fff;">
+              <h2 style="color: #1e3a8a; margin-top: 0; font-size: 18px;">Xin chào ${username},</h2>
+              <p style="line-height: 1.6; font-size: 15px;">Tài khoản của bạn đã được quản trị viên khởi tạo thành công trên hệ thống <b>MentorHub</b>.</p>
+              <p style="line-height: 1.6; font-size: 15px;">Dưới đây là thông tin tài khoản đăng nhập của bạn:</p>
+              
+              <div style="margin: 20px 0; padding: 16px; background-color: #f3f4f6; border-left: 4px solid #2563eb; border-radius: 4px;">
+                <p style="margin: 0 0 8px; font-size: 14px; color: #4b5563;"><strong>Email:</strong> <span style="color: #111827; font-family: monospace;">${toEmail}</span></p>
+                <p style="margin: 0; font-size: 14px; color: #4b5563;"><strong>Mật khẩu tạm thời:</strong> <code style="background-color: #e5e7eb; padding: 2px 6px; border-radius: 4px; color: #b91c1c; font-family: monospace; font-size: 14px; font-weight: bold;">${plainPassword}</code></p>
+              </div>
+              
+              <p style="line-height: 1.6; font-size: 15px;">Vui lòng truy cập liên kết dưới đây để đăng nhập và bắt đầu sử dụng:</p>
+              
+              <div style="margin: 28px 0; text-align: center;">
+                <a href="${loginLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 30px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 15px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+                  Đăng nhập hệ thống
+                </a>
+              </div>
+              
+              <p style="color: #6b7280; font-size: 13px; line-height: 1.5; font-style: italic; background-color: #eff6ff; padding: 12px; border-radius: 6px; border: 1px dashed #bfdbfe;">
+                * <strong>Lưu ý bảo mật:</strong> Để đảm bảo an toàn thông tin cá nhân, hệ thống sẽ tự động yêu cầu bạn thay đổi mật khẩu mới trong lần đầu tiên đăng nhập.
+              </p>
+              
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;">
+              <p style="font-size: 13px; color: #9ca3af; margin: 0;">Trân trọng,<br><strong style="color: #4b5563;">Đội ngũ phát triển MentorHub</strong></p>
             </div>
-            <p style="color: #666; font-size: 13px;">Sau lần đăng nhập đầu tiên, hệ thống sẽ yêu cầu đổi mật khẩu.</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
-            <p style="font-size: 13px; color: #888;">Trân trọng,<br>SmartHR</p>
+            <div style="background-color: #f9fafb; padding: 16px; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #e5e7eb;">
+              Đây là email tự động từ hệ thống MentorHub. Vui lòng không phản hồi email này.
+            </div>
         </div>`
     };
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router';
 import type { Task } from '@/type';
-import { useProjectQueryById, useUpdateProjectTitleMutation, useUpdateProjectDescriptionMutation, useAddMemberToProjectMutation, useRemoveMemberFromProjectMutation, useProjectDelayPrediction } from '@/hooks/use-project';
+import { useProjectQueryById, useUpdateProjectTitleMutation, useUpdateProjectDescriptionMutation, useUpdateProjectStatusMutation, useAddMemberToProjectMutation, useRemoveMemberFromProjectMutation, useProjectDelayPrediction } from '@/hooks/use-project';
 import type { PredictionResult, ModelEvaluation } from '@/hooks/use-project';
 import type { TaskStatus } from '@/type';
 import { Loader } from '@/components/loader';
@@ -74,6 +74,7 @@ const ProjectDetails = () => {
     const { mutate: updateDescription, isPending: isUpdatingDescription } = useUpdateProjectDescriptionMutation();
     const { mutate: addMember, isPending: isAddingMember } = useAddMemberToProjectMutation();
     const { mutate: removeMember, isPending: isRemovingMember } = useRemoveMemberFromProjectMutation();
+    const { mutate: updateStatus, isPending: isUpdatingStatus } = useUpdateProjectStatusMutation();
     const [isPredictingLocal, setIsPredictingLocal] = useState(false);
     // const { mutate: predictDelay, isPending: isPredicting } = useProjectDelayPrediction();
     const { data: usersData, isLoading: isLoadingUsers } = useGetAllUsersQuery(searchQuery);
@@ -408,6 +409,44 @@ const ProjectDetails = () => {
                                         >
                                             <Edit className="size-4" />
                                         </Button>
+                                    )}
+                                    {isCurrentUserLeader ? (
+                                        <select
+                                            value={(project as any)?.status || 'Pending'}
+                                            onChange={(e) => {
+                                                updateStatus({ projectId: projectId!, status: e.target.value });
+                                            }}
+                                            disabled={isUpdatingStatus}
+                                            className={cn(
+                                                "ml-2 h-8 rounded-md border px-2 py-1 text-xs font-semibold shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors",
+                                                (project as any)?.status === 'Completed'
+                                                    ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800"
+                                                    : (project as any)?.status === 'In Progress'
+                                                        ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800"
+                                                        : "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800",
+                                                isUpdatingStatus && "opacity-50 cursor-not-allowed"
+                                            )}
+                                        >
+                                            <option value="Pending">Đang chờ</option>
+                                            <option value="In Progress">Đang tiến hành</option>
+                                            <option value="Completed">Hoàn thành</option>
+                                        </select>
+                                    ) : (
+                                        <Badge
+                                            variant="outline"
+                                            className={cn(
+                                                "ml-2 text-xs font-semibold",
+                                                (project as any)?.status === 'Completed'
+                                                    ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800"
+                                                    : (project as any)?.status === 'In Progress'
+                                                        ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-800"
+                                                        : "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800"
+                                            )}
+                                        >
+                                            {(project as any)?.status === 'Completed' ? 'Hoàn thành'
+                                                : (project as any)?.status === 'In Progress' ? 'Đang tiến hành'
+                                                : 'Đang chờ'}
+                                        </Badge>
                                     )}
                                 </>
                             )}

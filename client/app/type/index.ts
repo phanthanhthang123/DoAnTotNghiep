@@ -199,6 +199,7 @@ export interface Message {
   type: 'text' | 'image' | 'file' | 'system';
   attachment_url?: string | null;
   reply_to_id?: string | null;
+  replyTo?: Message | null;
   edited_at?: string | null;
   is_pinned?: boolean;
   pinned_by?: string | null;

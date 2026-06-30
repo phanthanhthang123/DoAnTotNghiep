@@ -42,9 +42,7 @@ def compute_weighted_kpi(members_data: list[dict]) -> tuple[float, list[dict]]:
     - Dữ liệu KPI cá nhân đã được tính sẵn khi tạo account (truyền vào qua kpi)
     - Hệ số ảnh hưởng tới Dự Án (Impact Weight):
       + Leader/PM: x2.0
-      + Manager: x1.5
-      + Intern: x0.5
-      + Member: x1.0
+      + Member / Developer / Manager: x1.0
     """
     if not members_data:
         return 0.5, []
@@ -60,12 +58,8 @@ def compute_weighted_kpi(members_data: list[dict]) -> tuple[float, list[dict]]:
         # ── Hệ số ảnh hưởng tới Dự Án (Impact Weight) ──
         if role in ["leader", "project manager", "pm", "admin", "kleader"]:
             impact_weight = 2.0  # Ảnh hưởng x2
-        elif role in ["sub-leader", "manager", "tech lead"]:
-            impact_weight = 1.5  # Ảnh hưởng x1.5
-        elif role in ["intern", "fresher", "trainee"]:
-            impact_weight = 0.5  # Ảnh hưởng x0.5
         else:
-            impact_weight = 1.0  # Member bình thường x1
+            impact_weight = 1.0  # Member/Developer/Manager bình thường x1
 
         total_weighted_kpi += kpi_val * impact_weight
         total_impact_weight += impact_weight

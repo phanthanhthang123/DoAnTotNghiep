@@ -143,15 +143,30 @@ const ProjectList = (props: {
                 ? format(new Date(project.end_date), "dd/MM/yyyy")
                 : "—";
 
+              const isOverdue =
+                project.status !== 'Completed' &&
+                project.end_date &&
+                new Date(project.end_date) < new Date();
+
               return (
                 <div
                   key={project.id}
-                  className="bg-white rounded-lg border p-4 shadow-sm hover:border-blue-500 transition-colors cursor-pointer space-y-3"
+                  className={cn(
+                    "bg-white rounded-lg border p-4 shadow-sm hover:border-blue-500 transition-colors cursor-pointer space-y-3",
+                    isOverdue && "border-red-200 bg-red-50/10 hover:border-red-500"
+                  )}
                   onClick={() => navigate(href)}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-1">
-                      <h4 className="font-semibold text-slate-900 line-clamp-1">{project.name}</h4>
+                      <div className="flex items-center flex-wrap gap-1.5">
+                        <h4 className="font-semibold text-slate-900 line-clamp-1">{project.name}</h4>
+                        {isOverdue && (
+                          <span className="bg-red-100 text-red-800 dark:bg-red-950/20 dark:text-red-400 text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 dark:border-red-800 uppercase tracking-wide shrink-0">
+                            Trễ hạn
+                          </span>
+                        )}
+                      </div>
                       {project.description && (
                         <p className="text-xs text-slate-500 line-clamp-2">{project.description}</p>
                       )}
@@ -178,7 +193,7 @@ const ProjectList = (props: {
                     <div>
                       Task: <span className="font-semibold text-slate-700">{project?.tasks?.length ?? 0}</span>
                     </div>
-                    <div className="font-mono text-[11px]">
+                    <div className={cn("font-mono text-[11px]", isOverdue ? "text-red-600 font-semibold" : "text-slate-500")}>
                       {start} → {end}
                     </div>
                   </div>
@@ -214,6 +229,11 @@ const ProjectList = (props: {
                     ? format(new Date(project.end_date), "dd/MM/yyyy")
                     : "—";
 
+                  const isOverdue =
+                    project.status !== 'Completed' &&
+                    project.end_date &&
+                    new Date(project.end_date) < new Date();
+
                   return (
                     <tr
                       key={project.id}
@@ -221,7 +241,8 @@ const ProjectList = (props: {
                       tabIndex={0}
                       className={cn(
                         "border-b border-border/60 last:border-0 transition-colors",
-                        "hover:bg-muted/50 cursor-pointer"
+                        "hover:bg-muted/50 cursor-pointer",
+                        isOverdue && "hover:bg-red-50/10"
                       )}
                       onClick={() => navigate(href)}
                       onKeyDown={(e) => {
@@ -232,8 +253,15 @@ const ProjectList = (props: {
                       }}
                     >
                       <td className="p-2 align-middle">
-                        <div className="font-medium text-foreground line-clamp-2 max-w-[220px] sm:max-w-[280px]">
-                          {project.name}
+                        <div className="flex items-center gap-2 max-w-[220px] sm:max-w-[280px]">
+                          <div className="font-medium text-foreground line-clamp-2">
+                            {project.name}
+                          </div>
+                          {isOverdue && (
+                            <span className="bg-red-100 text-red-800 dark:bg-red-950/20 dark:text-red-400 text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-200 dark:border-red-800 uppercase tracking-wide shrink-0">
+                              Trễ hạn
+                            </span>
+                          )}
                         </div>
                         {project.description ? (
                           <div className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5 max-w-[280px]">
@@ -262,8 +290,13 @@ const ProjectList = (props: {
                       <td className="p-2 align-middle text-center tabular-nums">
                         {project?.tasks?.length ?? 0}
                       </td>
-                      <td className="p-2 align-middle text-muted-foreground whitespace-nowrap">
-                        {start} → {end}
+                      <td className={cn("p-2 align-middle whitespace-nowrap", isOverdue ? "text-red-600 font-medium" : "text-muted-foreground")}>
+                        <div className="flex items-center gap-1.5">
+                          {isOverdue && (
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                          )}
+                          <span>{start} → {end}</span>
+                        </div>
                       </td>
                     </tr>
                   );

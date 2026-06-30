@@ -1,7 +1,7 @@
 {
-  "name": "server-project-manager",
+  "name": "server-mentorhub",
   "version": "1.0.0",
-  "description": "Server for Project Manager",
+  "description": "Server for MentorHub",
   "main": "server.js",
   "dependencies": {
     "bcrypt": "^6.0.0",

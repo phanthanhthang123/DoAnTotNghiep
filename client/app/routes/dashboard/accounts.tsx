@@ -20,6 +20,15 @@ import { Plus, Pencil, Trash2, Lock, Unlock } from "lucide-react";
 import type { User } from "@/type";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 function userInitials(name?: string | null) {
   const n = (name || "").trim();
@@ -88,12 +97,15 @@ type AdminSendUserCredentialsEmailResponse = {
   response?: any;
 };
 
+const ACCOUNTS_PER_PAGE = 6;
+
 const AccountsPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [search, setSearch] = React.useState("");
+  const [page, setPage] = React.useState(1);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [createdTempPassword, setCreatedTempPassword] = React.useState<string | null>(null);
   const [createdEmail, setCreatedEmail] = React.useState<string | null>(null);
@@ -481,6 +493,14 @@ const AccountsPage: React.FC = () => {
   }, [editYearsAtCompanyText, editingUser?.id]);
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
+
+  // Pagination computation
+  const allAccounts = data || [];
+  const totalPages = Math.max(1, Math.ceil(allAccounts.length / ACCOUNTS_PER_PAGE));
+  const safePage = Math.min(Math.max(page, 1), totalPages);
+  const startIndex = (safePage - 1) * ACCOUNTS_PER_PAGE;
+  const endIndex = startIndex + ACCOUNTS_PER_PAGE;
+  const paginatedData = allAccounts.slice(startIndex, endIndex);
 
   return (
     <div className="space-y-6">
@@ -871,7 +891,10 @@ const AccountsPage: React.FC = () => {
               className="w-full sm:max-w-xs bg-white border-slate-300 text-slate-900 placeholder:text-slate-400"
               placeholder="Tìm theo tên hoặc email..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
             />
             <p className="text-xs text-muted-foreground">
               Chỉ tài khoản Admin mới có quyền quản lý người dùng.
@@ -892,7 +915,7 @@ const AccountsPage: React.FC = () => {
             )}
             {!isLoading &&
               data &&
-              data.map((u) => (
+              paginatedData.map((u) => (
                 <div
                   key={u.id}
                   className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm hover:border-blue-500 transition-colors space-y-3"
@@ -1060,7 +1083,7 @@ const AccountsPage: React.FC = () => {
                 )}
                 {!isLoading &&
                   data &&
-                  data.map((u) => (
+                  paginatedData.map((u) => (
                     <tr
                       key={u.id}
                       className="border-t border-slate-100 hover:bg-blue-50"
@@ -1174,6 +1197,85 @@ const AccountsPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {!isLoading && data && data.length > ACCOUNTS_PER_PAGE && (
+              <div className="flex flex-col items-center gap-3 pt-2">
+                <Pagination>
+                  <PaginationContent className="gap-2">
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (safePage > 1) setPage(safePage - 1);
+                        }}
+                        className={cn(
+                          "min-w-[100px]",
+                          safePage === 1
+                            ? "pointer-events-none opacity-50 cursor-not-allowed"
+                            : "hover:bg-accent hover:text-accent-foreground transition-colors"
+                        )}
+                      />
+                    </PaginationItem>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
+                      if (p === 1 || p === totalPages || (p >= safePage - 1 && p <= safePage + 1)) {
+                        return (
+                          <PaginationItem key={p}>
+                            <PaginationLink
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setPage(p);
+                              }}
+                              isActive={safePage === p}
+                              className={cn(
+                                "min-w-[40px] h-10 flex items-center justify-center",
+                                safePage === p
+                                  ? "bg-primary text-primary-foreground font-semibold"
+                                  : "hover:bg-accent hover:text-accent-foreground transition-colors"
+                              )}
+                            >
+                              {p}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      }
+                      if (p === safePage - 2 || p === safePage + 2) {
+                        return (
+                          <PaginationItem key={p}>
+                            <span className="px-2 py-2 text-muted-foreground">...</span>
+                          </PaginationItem>
+                        );
+                      }
+                      return null;
+                    })}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (safePage < totalPages) setPage(safePage + 1);
+                        }}
+                        className={cn(
+                          "min-w-[100px]",
+                          safePage === totalPages
+                            ? "pointer-events-none opacity-50 cursor-not-allowed"
+                            : "hover:bg-accent hover:text-accent-foreground transition-colors"
+                        )}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+
+                <div className="text-xs text-muted-foreground">
+                  Trang {safePage} / {totalPages} • Hiển thị {startIndex + 1}-{Math.min(endIndex, data.length)} trong tổng số{" "}
+                  {data.length} tài khoản
+                </div>
+              </div>
+          )}
         </CardContent>
       </Card>
     </div>

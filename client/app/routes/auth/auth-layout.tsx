@@ -38,7 +38,7 @@ const AuthLayout = () => {
         <Link to="/">
           <span className="inline-flex items-center rounded-full bg-slate-800/70 border border-slate-700 px-3 py-1 text-xs font-medium text-slate-200 shadow-sm backdrop-blur">
             <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
-            ProjectFlow – không gian làm việc cho cả đội
+            MentorHub – không gian làm việc cho cả đội
           </span>
         </Link>
         <div className="hidden lg:block space-y-6">

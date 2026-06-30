@@ -523,3 +523,58 @@ export const removeMemberFromProjectService = (projectId, targetUserId, currentU
         reject(error);
     }
 });
+
+// UPDATE PROJECT STATUS
+export const updateProjectStatusService = (projectId, status, userId) => new Promise(async (resolve, reject) => {
+    try {
+        const validStatuses = ['Pending', 'In Progress', 'Completed'];
+        if (!validStatuses.includes(status)) {
+            return resolve({
+                err: 1,
+                msg: 'Trạng thái không hợp lệ. Chỉ chấp nhận: Pending, In Progress, Completed'
+            });
+        }
+
+        const project = await db.Project.findOne({
+            where: { id: projectId }
+        });
+
+        if (!project) {
+            return resolve({
+                err: 1,
+                msg: 'PROJECT NOT FOUND'
+            });
+        }
+
+        // Check if user is leader or creator
+        const isLeader = project.leader_id === userId || project.created_by === userId;
+        if (!isLeader) {
+            const member = await db.Project_Member.findOne({
+                where: {
+                    project_id: projectId,
+                    user_id: userId,
+                    role: 'Leader'
+                }
+            });
+            if (!member) {
+                return resolve({
+                    err: 1,
+                    msg: 'ONLY LEADER CAN UPDATE PROJECT STATUS'
+                });
+            }
+        }
+
+        await project.update({
+            status: status,
+            updatedAt: new Date()
+        });
+
+        resolve({
+            err: 0,
+            msg: 'OK',
+            response: project
+        });
+    } catch (error) {
+        reject(error);
+    }
+});

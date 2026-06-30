@@ -6,11 +6,11 @@ import i18n from "@/lib/i18n";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "ProjectFlow - Quản lý dự án hiệu quả" },
+    { title: "MentorHub - Quản lý dự án hiệu quả" },
     {
       name: "description",
       content:
-        "Theo dõi tiến độ, quản lý nhóm và tối ưu năng suất làm việc với ProjectFlow.",
+        "Theo dõi tiến độ, quản lý nhóm và tối ưu năng suất làm việc với MentorHub.",
     },
   ];
 }
@@ -46,7 +46,7 @@ const Homepage = () => {
               </span>
             </h1>
             <p className="text-sm sm:text-base text-slate-300 max-w-xl">
-              ProjectFlow giúp bạn theo dõi tiến độ, phân công công việc, và
+              MentorHub giúp bạn theo dõi tiến độ, phân công công việc, và
               phối hợp với đội nhóm trong một không gian làm việc thống nhất,
               trực quan và dễ sử dụng.
             </p>
@@ -283,7 +283,7 @@ const Homepage = () => {
               Sẵn sàng bắt đầu?
             </p>
             <h2 className="text-2xl font-semibold">
-              Đưa đội dự án của bạn lên một tầm cao mới với ProjectFlow.
+              Đưa đội dự án của bạn lên một tầm cao mới với MentorHub.
             </h2>
             <p className="text-sm text-slate-200">
               Đăng nhập bằng tài khoản đã được quản trị viên cấp và trải nghiệm

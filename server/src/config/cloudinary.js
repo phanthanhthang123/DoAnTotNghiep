@@ -44,3 +44,30 @@ export const destroyCloudinaryAsset = async (publicId) => {
     console.error('Cloudinary destroy failed:', e?.message || e);
   }
 };
+
+/**
+ * @param {Buffer} buffer
+ * @param {{ folder?: string; publicId?: string; resourceType?: string; contentDisposition?: string }} [opts]
+ */
+export const uploadFileBuffer = (buffer, opts = {}) =>
+  new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: opts.folder || 'doan-chat-attachments',
+        public_id: opts.publicId,
+        resource_type: opts.resourceType || 'auto',
+        content_disposition: opts.contentDisposition,
+      },
+      (err, result) => (err ? reject(err) : resolve(result))
+    );
+    uploadStream.end(buffer);
+  });
+
+export const getSignedUrl = (publicId, resourceType = 'raw') => {
+  if (!publicId || !isCloudinaryConfigured()) return '';
+  return cloudinary.url(publicId, {
+    resource_type: resourceType,
+    secure: true,
+    sign_url: true,
+  });
+};
